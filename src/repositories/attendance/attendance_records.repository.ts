@@ -106,7 +106,21 @@ export class AttendanceRecordsRepository {
   }
 
   public async create(data: AttendanceRecordInsert): Promise<AttendanceRecordSelect> {
-    const result = await db.insert(attendanceRecords).values(data).returning();
+    const payload: any = { ...data };
+
+    if (payload.volunteerUser) {
+      const { data: member } = await db
+        .from("members")
+        .select("id")
+        .eq("id", payload.volunteerUser)
+        .maybeSingle();
+
+      if (!member) {
+        delete payload.volunteerUser;
+      }
+    }
+
+    const result = await db.insert(attendanceRecords).values(payload).returning();
     return result[0];
   }
 

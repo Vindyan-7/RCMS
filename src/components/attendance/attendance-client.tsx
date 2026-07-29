@@ -175,11 +175,13 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
     });
   };
 
+  const [pinExpirationHours, setPinExpirationHours] = useState<number>(1);
+
   const handleGeneratePIN = async (sessionId: string) => {
     startTransition(async () => {
       const res = await generateVolunteerCodeAction({
         sessionId,
-        expirationHours: 4,
+        expirationHours: pinExpirationHours,
       });
 
       if (res.success && res.data) {
@@ -726,14 +728,31 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
             </div>
 
             <div className="space-y-3">
-              <Button
-                size="sm"
-                onClick={() => handleGeneratePIN(selectedSession.id)}
-                disabled={isPending}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs"
-              >
-                + Generate New Volunteer PIN
-              </Button>
+              <div className="flex items-center space-x-2 bg-muted/20 p-2.5 rounded-xl border border-border/60">
+                <div className="flex-1">
+                  <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Time Limit / Expiration</label>
+                  <select
+                    value={pinExpirationHours}
+                    onChange={(e) => setPinExpirationHours(Number(e.target.value))}
+                    className="w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none"
+                  >
+                    <option value={0.5}>30 Minutes</option>
+                    <option value={1}>1 Hour (Default)</option>
+                    <option value={2}>2 Hours</option>
+                    <option value={4}>4 Hours</option>
+                    <option value={876000}>No Limit (Permanent)</option>
+                  </select>
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={() => handleGeneratePIN(selectedSession.id)}
+                  disabled={isPending}
+                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs self-end h-8 px-3 rounded-lg"
+                >
+                  + Generate PIN
+                </Button>
+              </div>
 
               <div className="space-y-2 max-h-60 overflow-y-auto pt-2">
                 {sessionPins.length === 0 ? (

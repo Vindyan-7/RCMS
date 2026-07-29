@@ -77,23 +77,24 @@ export async function loginVolunteerPortalAction(
     const code = typeof input === "string" ? input : input.pinCode || "";
     const rawMemberInput = typeof input === "object" ? input.memberInput || "" : "";
 
-    let volunteerMember: any = null;
-    let memberId: string | undefined = undefined;
-
-    if (rawMemberInput) {
-      const { data: memberData } = await db
-        .from("members")
-        .select("*")
-        .or(`roll_number.eq.${rawMemberInput},club_membership_id.eq.${rawMemberInput},email.eq.${rawMemberInput},id.eq.${rawMemberInput}`)
-        .maybeSingle();
-
-      if (memberData) {
-        volunteerMember = memberData;
-        memberId = memberData.id;
-      }
+    if (!rawMemberInput) {
+      throw new Error("Please enter your Club Membership ID, Roll Number, or Member ID.");
     }
 
-    const codeRecord = await codesService.validateCode(code, memberId || "00000000-0000-0000-0000-000000000001");
+    const { data: memberData } = await db
+      .from("members")
+      .select("*")
+      .or(`roll_number.eq.${rawMemberInput},club_membership_id.eq.${rawMemberInput},email.eq.${rawMemberInput},id.eq.${rawMemberInput},member_id.eq.${rawMemberInput}`)
+      .maybeSingle();
+
+    if (!memberData) {
+      throw new Error("Access Denied: Member ID or Roll Number not found in Robotics Club directory.");
+    }
+
+    const volunteerMember = memberData;
+    const memberId = memberData.id;
+
+    const codeRecord = await codesService.validateCode(code, memberId);
     const sessionRes = await db.from("attendance_sessions").select("*").eq("id", codeRecord.sessionId).maybeSingle();
 
     return {
@@ -101,7 +102,7 @@ export async function loginVolunteerPortalAction(
       data: {
         codeRecord,
         session: sessionRes.data || null,
-        volunteerMember: volunteerMember || { name: rawMemberInput || "Volunteer", rollNumber: rawMemberInput },
+        volunteerMember,
       },
     };
   } catch (error) {
