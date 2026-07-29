@@ -1,11 +1,17 @@
 import { getLeaderboardAction } from "@/actions/points";
+import { getTasksAction } from "@/actions/operations";
 import { PointsClient } from "@/components/points/points-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function PointsPage() {
-  const leaderboardRes = await getLeaderboardAction();
+  const [leaderboardRes, tasksRes] = await Promise.all([
+    getLeaderboardAction(),
+    getTasksAction({ limit: 100 }),
+  ]);
+
   const leaderboardItems = leaderboardRes.data?.items || [];
+  const initialTasks = tasksRes.data?.items || [];
 
   return (
     <div className="space-y-6">
@@ -18,7 +24,7 @@ export default async function PointsPage() {
         </p>
       </div>
 
-      <PointsClient initialLeaderboard={leaderboardItems} />
+      <PointsClient initialLeaderboard={leaderboardItems} initialTasks={initialTasks} />
     </div>
   );
 }

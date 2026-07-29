@@ -10,6 +10,7 @@ import { UUID, PaginationQuery } from "@/core/types";
 export interface LeaderboardItem {
   memberId: UUID;
   memberName: string;
+  membershipId: string;
   rollNumber: string;
   totalPoints: number;
 }
@@ -96,7 +97,7 @@ export class PointsLedgerRepository {
 
     // Fetch members and their active non-revoked points sum
     const [membersRes, ledgerRes] = await Promise.all([
-      db.from("members").select("id, name, roll_number", { count: "exact" }).is("deleted_at", null),
+      db.from("members").select("id, name, roll_number, club_membership_id", { count: "exact" }).is("deleted_at", null),
       db.from(this.tableName).select("member_id, points, is_revoked"),
     ]);
 
@@ -113,6 +114,7 @@ export class PointsLedgerRepository {
     const leaderboard: LeaderboardItem[] = membersData.map((m: any) => ({
       memberId: m.id,
       memberName: m.name,
+      membershipId: m.club_membership_id || "",
       rollNumber: m.roll_number || "",
       totalPoints: pointsMap[m.id] || 0,
     }));

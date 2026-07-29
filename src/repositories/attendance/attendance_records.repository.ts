@@ -109,13 +109,13 @@ export class AttendanceRecordsRepository {
     const payload: any = { ...data };
 
     if (payload.volunteerUser) {
-      const { data: member } = await db
-        .from("members")
+      const { data: user } = await db
+        .from("users")
         .select("id")
         .eq("id", payload.volunteerUser)
         .maybeSingle();
 
-      if (!member) {
+      if (!user) {
         delete payload.volunteerUser;
       }
     }

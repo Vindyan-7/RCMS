@@ -76,19 +76,34 @@ export async function loginVolunteerPortalAction(
   try {
     const code = typeof input === "string" ? input : input.pinCode || "";
     const rawMemberInput = typeof input === "object" ? input.memberInput || "" : "";
+    const trimmedInput = rawMemberInput.trim().toLowerCase();
 
-    if (!rawMemberInput) {
+    if (!trimmedInput) {
       throw new Error("Please enter your Club Membership ID, Roll Number, or Member ID.");
     }
 
-    const { data: memberData } = await db
+    // Fetch active members to match case-insensitively across all member identifier fields
+    const { data: membersList, error } = await db
       .from("members")
       .select("*")
-      .or(`roll_number.eq.${rawMemberInput},club_membership_id.eq.${rawMemberInput},email.eq.${rawMemberInput},id.eq.${rawMemberInput},member_id.eq.${rawMemberInput}`)
-      .maybeSingle();
+      .is("deleted_at", null);
+
+    if (error || !membersList) {
+      throw new Error("Failed to query Robotics Club members directory.");
+    }
+
+    const memberData = membersList.find((m: any) => {
+      const roll = (m.roll_number || "").toLowerCase();
+      const clubId = (m.club_membership_id || "").toLowerCase();
+      const memId = (m.member_id || "").toLowerCase();
+      const email = (m.email || "").toLowerCase();
+      const uuid = (m.id || "").toLowerCase();
+
+      return roll === trimmedInput || clubId === trimmedInput || memId === trimmedInput || email === trimmedInput || uuid === trimmedInput;
+    });
 
     if (!memberData) {
-      throw new Error("Access Denied: Member ID or Roll Number not found in Robotics Club directory.");
+      throw new Error(`Access Denied: Identifier '${rawMemberInput}' not found in Robotics Club directory. Please check your Roll Number or Club Membership ID.`);
     }
 
     const volunteerMember = memberData;

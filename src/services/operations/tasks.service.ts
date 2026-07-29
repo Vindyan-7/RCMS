@@ -67,6 +67,13 @@ export class TasksService extends BaseService<
       throw new ConflictError("Task has already been completed by this member");
     }
 
+    if (!task.isUnlimited && task.maxMembers && task.maxMembers > 0) {
+      const currentCompletionsCount = await this.completionsRepo.getCompletionCount(taskId);
+      if (currentCompletionsCount >= task.maxMembers) {
+        throw new BadRequestError(`Task limit reached: This task has already reached its maximum allowed member completions (${task.maxMembers}).`);
+      }
+    }
+
     return this.completionsRepo.create({
       taskId,
       memberId,

@@ -37,6 +37,17 @@ export class TaskCompletionsRepository {
     return toCamelCase<TaskCompletionSelect>(data[0]);
   }
 
+  public async getCompletionCount(taskId: UUID): Promise<number> {
+    const { count, error } = await db
+      .from(this.tableName)
+      .select("id", { count: "exact", head: true })
+      .eq("task_id", taskId)
+      .eq("is_revoked", false);
+
+    if (error) return 0;
+    return count || 0;
+  }
+
   public async getByTaskId(
     taskId: UUID,
     query: PaginationQuery
@@ -94,12 +105,22 @@ export class TaskCompletionsRepository {
   }
 
   public async create(data: TaskCompletionInsert): Promise<TaskCompletionSelect> {
-    const payload: any = toSnakeCase(data);
-    delete payload.verified_by;
+    const actorId = data.completedBy || (data as any).verifiedBy || (data as any).verified_by;
 
-    const actorId = data.completedBy || (data as any).verifiedBy;
+    // Construct explicit payload with only existing DB columns
+    const payload: any = {
+      task_id: data.taskId,
+      member_id: data.memberId,
+    };
+
     if (actorId) {
       payload.completed_by = actorId;
+    }
+    if ((data as any).pointsAwarded !== undefined) {
+      payload.points_awarded = (data as any).pointsAwarded;
+    }
+    if ((data as any).status) {
+      payload.status = (data as any).status;
     }
 
     let { data: result, error } = await db

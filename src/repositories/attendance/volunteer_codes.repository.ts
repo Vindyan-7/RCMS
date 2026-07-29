@@ -40,13 +40,13 @@ export class VolunteerCodesRepository {
     };
 
     if (activatedBy) {
-      const { data: member } = await db
-        .from("members")
+      const { data: user } = await db
+        .from("users")
         .select("id")
         .eq("id", activatedBy)
         .maybeSingle();
 
-      if (member) {
+      if (user) {
         payload.activatedBy = activatedBy;
         payload.activatedAt = new Date();
       }

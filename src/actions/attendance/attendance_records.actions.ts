@@ -8,6 +8,7 @@ import { ApiResponse, PaginationQuery } from "@/core/types";
 import { AttendanceRecordSelect } from "@/db/schema";
 import { AttendanceRecordsRepository, AttendanceSessionsRepository } from "@/repositories/attendance";
 import { MembersRepository } from "@/repositories/members";
+import { PointsLedgerRepository } from "@/repositories/points";
 import { AttendanceRecordsService } from "@/services/attendance";
 import { AttendanceRecordsValidator } from "@/validation/attendance";
 import { formatErrorResponse } from "@/core/errors";
@@ -18,6 +19,7 @@ import { PaginatedResult } from "@/core/repository/repository.types";
 const recordsRepo = new AttendanceRecordsRepository();
 const sessionsRepo = new AttendanceSessionsRepository();
 const membersRepo = new MembersRepository();
+const ledgerRepo = new PointsLedgerRepository();
 const recordsService = new AttendanceRecordsService(recordsRepo, sessionsRepo, membersRepo);
 
 async function getActorContext() {
@@ -46,6 +48,24 @@ export async function recordAttendanceAction(
     );
 
     logger.info("[Action: recordAttendanceAction] Action completed successfully", { id: record.id });
+
+    // ── Sync attendance points to points_ledger so leaderboard reflects them ──
+    try {
+      const pts = Number((record as any).points ?? 0);
+      if (pts > 0) {
+        await ledgerRepo.create({
+          memberId: record.memberId,
+          category: "attendance",
+          referenceType: "attendance_record",
+          referenceId: record.id,
+          points: pts,
+          createdBy: actor.id,
+          remarks: `Attendance recorded for session ${record.sessionId}`,
+        });
+      }
+    } catch (ledgerErr) {
+      logger.warn("[Action: recordAttendanceAction] Ledger sync skipped", { error: String(ledgerErr) });
+    }
 
     return {
       success: true,
