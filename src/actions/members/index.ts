@@ -4,3 +4,4 @@
 
 export * from "./members.actions";
 export * from "./memberships.actions";
+export * from "./semesters.actions";

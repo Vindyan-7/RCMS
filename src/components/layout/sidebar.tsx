@@ -14,12 +14,14 @@ import {
   BarChart3,
   Settings,
   Bot,
+  GraduationCap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigationItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Members", href: "/dashboard/members", icon: Users },
+  { name: "Semesters", href: "/dashboard/semesters", icon: GraduationCap },
   { name: "Attendance", href: "/dashboard/attendance", icon: CalendarCheck },
   { name: "Operations", href: "/dashboard/operations", icon: CheckSquare },
   { name: "Points Engine", href: "/dashboard/points", icon: Award },

@@ -159,3 +159,79 @@ export async function getMembershipHistoryAction(
     return formatErrorResponse(error);
   }
 }
+import { SemestersRepository } from "@/repositories/members/semesters.repository";
+
+const semestersRepo = new SemestersRepository();
+
+export async function renewMembershipAction(
+  memberId: string
+): Promise<ApiResponse<MembershipSelect>> {
+  logger.info("[Action: renewMembershipAction] Initiating", { memberId });
+  try {
+    const actor = await getActorContext();
+    Authorizer.hasPermission(actor, PERMISSIONS.MEMBERS_EDIT);
+
+    // 1. Resolve the currently active semester
+    const activeSemester = await semestersRepo.findActive();
+    if (!activeSemester) {
+      return {
+        success: false,
+        error: {
+          code: "NO_ACTIVE_SEMESTER",
+          message: "There is no active semester to renew membership into. Activate a semester first.",
+        },
+      };
+    }
+
+    // 2. Close the current active membership (if any) — set to past
+    const currentMembership = await membershipsRepo.findActiveMembership(memberId);
+    if (currentMembership) {
+      // Already enrolled in this semester — no renewal needed
+      if (
+        currentMembership.semesterId === activeSemester.id &&
+        currentMembership.status === "active"
+      ) {
+        return {
+          success: false,
+          error: {
+            code: "MEMBERSHIP_ALREADY_ACTIVE",
+            message: "Member already has an active membership in the current semester.",
+          },
+        };
+      }
+
+      // Close the old membership gracefully
+      await membershipsRepo.update(
+        currentMembership.id,
+        { status: "past", exitDate: new Date() },
+        actor.id
+      );
+    }
+
+    // 3. Create a new membership for the active semester
+    //    Member ID (internal) is unchanged — only a new Membership record is inserted
+    const renewed = await membershipsRepo.create(
+      {
+        memberId,
+        academicYearId: activeSemester.academicYearId,
+        semesterId: activeSemester.id,
+        status: "active",
+        joinDate: new Date(),
+        createdBy: actor.id,
+        updatedBy: actor.id,
+      },
+      actor.id
+    );
+
+    logger.info("[Action: renewMembershipAction] Renewal complete", {
+      memberId,
+      newMembershipId: renewed.id,
+      semesterId: activeSemester.id,
+    });
+
+    return { success: true, data: renewed };
+  } catch (error) {
+    logger.error("[Action: renewMembershipAction] Failed", error);
+    return formatErrorResponse(error);
+  }
+}

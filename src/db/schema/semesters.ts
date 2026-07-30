@@ -2,9 +2,10 @@
  * Semesters Schema Definition
  */
 
-import { pgTable, uuid, varchar, date } from "drizzle-orm/pg-core";
+import { pgTable, varchar, date } from "drizzle-orm/pg-core";
 import { baseColumns } from "./base";
 import { academicYears } from "./academic_years";
+import { uuid } from "drizzle-orm/pg-core";
 
 export const semesters = pgTable("semesters", {
   academicYearId: uuid("academic_year_id")
@@ -13,7 +14,10 @@ export const semesters = pgTable("semesters", {
   name: varchar("name", { length: 50 }).notNull(),
   startDate: date("start_date", { mode: "date" }).notNull(),
   endDate: date("end_date", { mode: "date" }).notNull(),
-  status: varchar("status", { length: 20 }).default("active").notNull(),
+  registrationStart: date("registration_start", { mode: "date" }),
+  registrationEnd: date("registration_end", { mode: "date" }),
+  // upcoming | active | completed
+  status: varchar("status", { length: 20 }).default("upcoming").notNull(),
   ...baseColumns,
 });
 
