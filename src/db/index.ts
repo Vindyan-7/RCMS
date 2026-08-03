@@ -16,7 +16,7 @@ const supabaseKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YXBycWt6b2d3bmNoaGlrd3lqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NTExODkzMCwiZXhwIjoyMTAwNjk0OTMwfQ.PGs5ytdpE9-0VK90-itxkuFZUg_1m6k0eU0jTixKHF8";
 
-const client = postgres(connectionString, { prepare: false });
+const client = postgres(connectionString, { prepare: false, ssl: "require" });
 export const drizzleDb = drizzle(client, { schema });
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
