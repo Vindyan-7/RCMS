@@ -6,13 +6,7 @@ import { Users, CalendarCheck, CheckSquare, Box, DollarSign, Activity, AlertTria
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [metricsRes, kpiRes, insightsRes] = await Promise.all([
-    getExecutiveDashboardMetricsAction(),
-    getKpiMetricsAction(),
-    getSystemInsightsAction(),
-  ]);
-
-  const metrics = metricsRes.data || {
+  let metrics = {
     totalMembers: 0,
     activeMembers: 0,
     totalAttendanceSessions: 0,
@@ -24,14 +18,34 @@ export default async function DashboardPage() {
     financialNetBalance: 0,
   };
 
-  const kpis = kpiRes.data || {
+  let kpis = {
     memberActiveRatioPct: 0,
     averageAttendancePerSession: 0,
     taskCompletionVolume: 0,
     inventoryUtilizationPct: 0,
   };
 
-  const insights = insightsRes.data || [];
+  let insights: any[] = [];
+
+  try {
+    const results = await Promise.allSettled([
+      getExecutiveDashboardMetricsAction(),
+      getKpiMetricsAction(),
+      getSystemInsightsAction(),
+    ]);
+
+    if (results[0].status === "fulfilled" && results[0].value?.data) {
+      metrics = { ...metrics, ...results[0].value.data };
+    }
+    if (results[1].status === "fulfilled" && results[1].value?.data) {
+      kpis = { ...kpis, ...results[1].value.data };
+    }
+    if (results[2].status === "fulfilled" && results[2].value?.data) {
+      insights = results[2].value.data;
+    }
+  } catch (err) {
+    // Fail-safe default metrics
+  }
 
   return (
     <div className="space-y-8">
