@@ -3,7 +3,7 @@
  */
 
 import { eq, or, ilike, and, isNull, sql } from "drizzle-orm";
-import { db, supabase, toCamelCase } from "@/db";
+import { db, supabase, toCamelCase, toSnakeCase } from "@/db";
 import { members, MemberSelect, MemberInsert } from "@/db/schema";
 import { BaseRepository } from "@/core/repository/base-repository";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
@@ -171,23 +171,44 @@ export class MembersRepository extends BaseRepository<
       yearCode = String(currentYear).slice(-2);
     }
     const prefix = `SAC-RC-${yearCode}`;
-    const result = await db
-      .select({ memberId: members.memberId })
-      .from(members)
-      .where(sql`${members.memberId} LIKE ${prefix + '%'}`)
-      .orderBy(sql`LENGTH(${members.memberId}) DESC`, sql`${members.memberId} DESC`)
-      .limit(1);
+    try {
+      const result = await db
+        .select({ memberId: members.memberId })
+        .from(members)
+        .where(sql`${members.memberId} LIKE ${prefix + '%'}`)
+        .orderBy(sql`LENGTH(${members.memberId}) DESC`, sql`${members.memberId} DESC`)
+        .limit(1);
 
-    if (!result[0] || !result[0].memberId) {
-      return `${prefix}001`;
+      if (result[0] && result[0].memberId) {
+        const lastId = result[0].memberId;
+        const seqStr = lastId.replace(prefix, "");
+        const lastSeq = parseInt(seqStr, 10);
+        const nextSeq = isNaN(lastSeq) ? 1 : lastSeq + 1;
+        return `${prefix}${String(nextSeq).padStart(3, "0")}`;
+      }
+    } catch {
+      // Fallback via Supabase REST API
     }
 
-    const lastId = result[0].memberId;
-    const seqStr = lastId.replace(prefix, "");
-    const lastSeq = parseInt(seqStr, 10);
-    const nextSeq = isNaN(lastSeq) ? 1 : lastSeq + 1;
-    const paddedSeq = String(nextSeq).padStart(3, "0");
-    return `${prefix}${paddedSeq}`;
+    try {
+      const { data } = await supabase
+        .from("members")
+        .select("member_id")
+        .like("member_id", `${prefix}%`)
+        .order("member_id", { ascending: false })
+        .limit(1);
+      if (data && data[0] && data[0].member_id) {
+        const lastId = data[0].member_id;
+        const seqStr = lastId.replace(prefix, "");
+        const lastSeq = parseInt(seqStr, 10);
+        const nextSeq = isNaN(lastSeq) ? 1 : lastSeq + 1;
+        return `${prefix}${String(nextSeq).padStart(3, "0")}`;
+      }
+    } catch {
+      // Ignore
+    }
+
+    return `${prefix}001`;
   }
 
   public async create(data: MemberInsert, creatorId: UUID): Promise<MemberSelect> {
@@ -211,8 +232,19 @@ export class MembersRepository extends BaseRepository<
       ...audit,
     };
 
-    const result = await db.insert(members).values(payload).returning();
-    return result[0];
+    try {
+      const result = await db.insert(members).values(payload).returning();
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[MembersRepository] Drizzle insert error, falling back to REST API", err);
+    }
+
+    const snakePayload = toSnakeCase(payload);
+    const { data: restResult, error } = await supabase.from("members").insert(snakePayload).select().single();
+    if (error || !restResult) {
+      throw new Error(`[MembersRepository] Create failed: ${error?.message || "Unknown error"}`);
+    }
+    return toCamelCase<MemberSelect>(restResult);
   }
 
   public async update(
@@ -226,13 +258,30 @@ export class MembersRepository extends BaseRepository<
       ...audit,
     };
 
-    const result = await db
-      .update(members)
-      .set(payload)
-      .where(and(eq(members.id, id), isNull(members.deletedAt)))
-      .returning();
+    try {
+      const result = await db
+        .update(members)
+        .set(payload)
+        .where(and(eq(members.id, id), isNull(members.deletedAt)))
+        .returning();
 
-    return result[0];
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[MembersRepository] Drizzle update error, falling back to REST API", err);
+    }
+
+    const snakePayload = toSnakeCase(payload);
+    const { data: restResult, error } = await supabase
+      .from("members")
+      .update(snakePayload)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error || !restResult) {
+      throw new Error(`[MembersRepository] Update failed: ${error?.message || "Unknown error"}`);
+    }
+    return toCamelCase<MemberSelect>(restResult);
   }
 
   public async delete(id: UUID, deleterId: UUID): Promise<boolean> {
