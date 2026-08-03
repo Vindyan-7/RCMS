@@ -8,14 +8,18 @@ import { MembersRepository } from "@/repositories/members/members.repository";
 import { PointsLedgerSelect, PointsLedgerInsert, PointRuleSelect, PointRuleInsert } from "@/db/schema";
 import { UUID, PaginationQuery } from "@/core/types";
 import { PaginatedResult } from "@/core/repository/repository.types";
-import { NotFoundError, BadRequestError } from "@/core/errors";
+import { MembershipsRepository } from "@/repositories/members/memberships.repository";
+import { SemesterContextService } from "@/services/academic/semester-context.service";
+import { ConflictError, NotFoundError, BadRequestError } from "@/core/errors";
 import { logger } from "@/core/logger";
 
 export class PointsService {
   constructor(
     private readonly ledgerRepo: PointsLedgerRepository,
     private readonly rulesRepo: PointRulesRepository,
-    private readonly membersRepo?: MembersRepository
+    private readonly membersRepo?: MembersRepository,
+    private readonly membershipsRepo: MembershipsRepository = new MembershipsRepository(),
+    private readonly semesterContextService: SemesterContextService = new SemesterContextService()
   ) {}
 
   public async awardPoints(
@@ -36,6 +40,17 @@ export class PointsService {
       actorId,
     });
 
+    const activeSemester = await this.semesterContextService.getActiveSemester();
+    if (activeSemester) {
+      const activeMem = await this.membershipsRepo.findActiveMembership(data.memberId);
+      if (!activeMem || activeMem.semesterId !== activeSemester.id || activeMem.status !== "active") {
+        throw new ConflictError(
+          "Member is not renewed for the active semester. Only active semester members can receive points.",
+          "MEMBER_NOT_RENEWED"
+        );
+      }
+    }
+
     if (this.membersRepo) {
       const member = await this.membersRepo.findById(data.memberId);
       if (!member) {
@@ -52,6 +67,7 @@ export class PointsService {
       category: data.category,
       referenceType: data.referenceType,
       referenceId: data.referenceId,
+      semesterId: activeSemester?.id,
       points: data.points,
       createdBy: actorId,
       remarks: data.remarks,
@@ -77,11 +93,14 @@ export class PointsService {
       throw new BadRequestError("Deduction points value must be greater than zero");
     }
 
+    const activeSemester = await this.semesterContextService.getActiveSemester();
+
     // Ledger stores deductions as negative integer values
     return this.ledgerRepo.create({
       memberId: data.memberId,
       category: data.category || "penalty",
       referenceType: "manual",
+      semesterId: activeSemester?.id,
       points: -Math.abs(data.points),
       createdBy: actorId,
       remarks: data.remarks,
@@ -106,6 +125,7 @@ export class PointsService {
       category: "rollback",
       referenceType: "points_ledger",
       referenceId: originalRecord.id,
+      semesterId: originalRecord.semesterId,
       points: -originalRecord.points,
       createdBy: actorId,
       remarks: `Rollback of transaction ${transactionId}: ${reason}`,
@@ -150,8 +170,9 @@ export class PointsService {
     };
   }
 
-  public async getLeaderboard(pagination: PaginationQuery): Promise<PaginatedResult<LeaderboardItem>> {
-    return this.ledgerRepo.getLeaderboard(pagination);
+  public async getLeaderboard(pagination: PaginationQuery, semesterId?: string): Promise<PaginatedResult<LeaderboardItem>> {
+    const targetSemId = semesterId !== undefined ? semesterId : ((await this.semesterContextService.getActiveSemesterId()) || undefined);
+    return this.ledgerRepo.getLeaderboard(pagination, targetSemId);
   }
 
   public async createPointRule(data: any, actorId: UUID): Promise<PointRuleSelect> {

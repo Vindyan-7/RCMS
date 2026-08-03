@@ -79,7 +79,7 @@ export async function runOperationsDomainIntegrationTests() {
       assert(duplicateCompleteRes.success === false, "ServerAction: Rejects duplicate task completion");
 
       const completionsRes = await getTaskCompletionsAction(taskId);
-      assert(completionsRes.success === true && completionsRes.data?.items.length > 0, "ServerAction: getTaskCompletionsAction lists completions");
+      assert(completionsRes.success === true && (completionsRes.data?.items?.length || 0) > 0, "ServerAction: getTaskCompletionsAction lists completions");
     }
 
     // Create & verify Event
@@ -101,7 +101,7 @@ export async function runOperationsDomainIntegrationTests() {
       assert(duplicateVerifyRes.success === false, "ServerAction: Rejects duplicate event participation verification");
 
       const participationsRes = await getEventParticipationsAction(eventId);
-      assert(participationsRes.success === true && participationsRes.data?.items.length > 0, "ServerAction: getEventParticipationsAction lists event participations");
+      assert(participationsRes.success === true && (participationsRes.data?.items?.length || 0) > 0, "ServerAction: getEventParticipationsAction lists event participations");
     }
   }
 

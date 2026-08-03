@@ -2,8 +2,9 @@
  * Points Domain - Points Ledger Repository Implementation (Supabase JS Client)
  */
 
-import { db, toCamelCase, toSnakeCase } from "@/db";
-import { PointsLedgerSelect, PointsLedgerInsert } from "@/db/schema";
+import { db, drizzleDb, toCamelCase, toSnakeCase } from "@/db";
+import { PointsLedgerSelect, PointsLedgerInsert, members, memberships } from "@/db/schema";
+import { eq, and, isNull } from "drizzle-orm";
 import { PaginatedResult } from "@/core/repository/repository.types";
 import { UUID, PaginationQuery } from "@/core/types";
 
@@ -89,39 +90,62 @@ export class PointsLedgerRepository {
   }
 
   public async getLeaderboard(
-    query: PaginationQuery
+    query: PaginationQuery,
+    semesterId?: string
   ): Promise<PaginatedResult<LeaderboardItem>> {
     const page = query.page || 1;
     const limit = query.limit || 1000;
     const offset = (page - 1) * limit;
 
-    // Fetch members and their active non-revoked points sum
-    const [membersRes, ledgerRes] = await Promise.all([
-      db.from("members").select("id, name, roll_number, club_membership_id", { count: "exact" }).is("deleted_at", null),
-      db.from(this.tableName).select("member_id, points, is_revoked"),
-    ]);
+    let enrolledMembers: Array<{ id: string; name: string; rollNumber: string | null; clubMembershipId: string | null; memberId: string }> = [];
 
-    const membersData = membersRes.data || [];
-    const ledgerData = ledgerRes.data || [];
-
-    const pointsMap: Record<string, number> = {};
-    for (const entry of ledgerData) {
-      if (entry.is_revoked) continue; // Skip revoked ledger entries
-      const mId = entry.member_id;
-      pointsMap[mId] = (pointsMap[mId] || 0) + (Number(entry.points) || 0);
+    if (semesterId) {
+      const rows = await drizzleDb
+        .select({
+          id: members.id,
+          name: members.name,
+          rollNumber: members.rollNumber,
+          clubMembershipId: members.clubMembershipId,
+          memberId: members.memberId,
+        })
+        .from(memberships)
+        .innerJoin(members, eq(memberships.memberId, members.id))
+        .where(
+          and(
+            eq(memberships.semesterId, semesterId),
+            eq(memberships.status, "active"),
+            isNull(memberships.deletedAt),
+            isNull(members.deletedAt)
+          )
+        );
+      enrolledMembers = rows;
+    } else {
+      enrolledMembers = [];
     }
 
-    const leaderboard: LeaderboardItem[] = membersData.map((m: any) => ({
+    const { data: ledgerData } = await db.from(this.tableName).select("member_id, points, is_revoked, semester_id");
+
+    const pointsMap: Record<string, number> = {};
+    if (ledgerData) {
+      for (const entry of ledgerData) {
+        if (entry.is_revoked) continue;
+        if (semesterId && entry.semester_id && entry.semester_id !== semesterId) continue;
+        const mId = entry.member_id;
+        pointsMap[mId] = (pointsMap[mId] || 0) + (Number(entry.points) || 0);
+      }
+    }
+
+    const leaderboard: LeaderboardItem[] = enrolledMembers.map((m) => ({
       memberId: m.id,
       memberName: m.name,
-      membershipId: m.club_membership_id || "",
-      rollNumber: m.roll_number || "",
+      membershipId: m.memberId || m.clubMembershipId || "",
+      rollNumber: m.rollNumber || "",
       totalPoints: pointsMap[m.id] || 0,
     }));
 
     leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
 
-    const total = membersRes.count || leaderboard.length;
+    const total = leaderboard.length;
     const items = leaderboard.slice(offset, offset + limit);
 
     return {

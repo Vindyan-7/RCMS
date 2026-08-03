@@ -119,10 +119,10 @@ export async function runAttendanceDomainIntegrationTests() {
 
       // Query session records & member records
       const sessionRecordsRes = await getSessionRecordsAction(sessionId);
-      assert(sessionRecordsRes.success === true && sessionRecordsRes.data?.items.length > 0, "ServerAction: getSessionRecordsAction lists check-ins");
+      assert(sessionRecordsRes.success === true && (sessionRecordsRes.data?.items?.length || 0) > 0, "ServerAction: getSessionRecordsAction lists check-ins");
 
       const memberRecordsRes = await getMemberAttendanceRecordsAction(memberId);
-      assert(memberRecordsRes.success === true && memberRecordsRes.data?.items.length > 0, "ServerAction: getMemberAttendanceRecordsAction lists member history");
+      assert(memberRecordsRes.success === true && (memberRecordsRes.data?.items?.length || 0) > 0, "ServerAction: getMemberAttendanceRecordsAction lists member history");
 
       // Pause, Close, Lock session transitions
       const pauseRes = await pauseAttendanceSessionAction(sessionId);

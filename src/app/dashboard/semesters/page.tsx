@@ -1,17 +1,15 @@
-import { getAllSemestersAction } from "@/actions/members/semesters.actions";
-import { searchMembersAction } from "@/actions/members/members.actions";
+import { getSemesterDashboardDataAction } from "@/actions/members/semesters.actions";
 import { SemesterLifecycleClient } from "@/components/semesters/semester-lifecycle-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function SemestersPage() {
-  const [semestersRes, membersRes] = await Promise.all([
-    getAllSemestersAction(),
-    searchMembersAction("", { limit: 1000 }),
-  ]);
+  const dashboardRes = await getSemesterDashboardDataAction();
 
-  const semesters = semestersRes.data?.items || [];
-  const members = membersRes.data?.items || [];
+  const semesters = dashboardRes.data?.semesters || [];
+  const members = dashboardRes.data?.members || [];
+  const academicYears = dashboardRes.data?.academicYears || [];
+  const initialActiveMemberships = dashboardRes.data?.activeMemberships || {};
 
   return (
     <div className="space-y-6">
@@ -24,7 +22,12 @@ export default async function SemestersPage() {
         </p>
       </div>
 
-      <SemesterLifecycleClient initialSemesters={semesters} initialMembers={members} />
+      <SemesterLifecycleClient
+        initialSemesters={semesters}
+        initialMembers={members}
+        academicYears={academicYears}
+        initialActiveMemberships={initialActiveMemberships}
+      />
     </div>
   );
 }

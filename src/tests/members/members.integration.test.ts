@@ -79,7 +79,7 @@ export async function runMembersDomainIntegrationTests() {
 
     // Test member search
     const searchResult = await searchMembersAction("Alice");
-    assert(searchResult.success === true && searchResult.data?.items.length > 0, "ServerAction: searchMembersAction returns matching records");
+    assert(searchResult.success === true && (searchResult.data?.items?.length || 0) > 0, "ServerAction: searchMembersAction returns matching records");
 
     // Test archiving & restoration
     const archiveResult = await archiveMemberAction(memberId);
@@ -117,7 +117,7 @@ export async function runMembersDomainIntegrationTests() {
 
       // Test membership history
       const historyResult = await getMembershipHistoryAction(memberId);
-      assert(historyResult.success === true && historyResult.data?.length > 0, "ServerAction: getMembershipHistoryAction returns enrollment array");
+      assert(historyResult.success === true && (historyResult.data?.length || 0) > 0, "ServerAction: getMembershipHistoryAction returns enrollment array");
     }
   }
 

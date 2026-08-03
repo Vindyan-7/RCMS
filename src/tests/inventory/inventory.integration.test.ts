@@ -106,7 +106,7 @@ export async function runInventoryDomainIntegrationTests() {
 
         // Verify Member Borrowing History
         const historyRes = await getMemberBorrowingsAction(memberId);
-        assert(historyRes.success === true && historyRes.data?.items.length > 0, "ServerAction: getMemberBorrowingsAction returns member borrowings list");
+        assert(historyRes.success === true && (historyRes.data?.items?.length || 0) > 0, "ServerAction: getMemberBorrowingsAction returns member borrowings list");
 
         // Return Borrowing
         const returnRes = await returnBorrowingAction({
@@ -119,7 +119,7 @@ export async function runInventoryDomainIntegrationTests() {
 
       // Query All Inventory Items
       const listRes = await getInventoryItemsAction();
-      assert(listRes.success === true && listRes.data?.items.length > 0, "ServerAction: getInventoryItemsAction lists items catalog");
+      assert(listRes.success === true && (listRes.data?.items?.length || 0) > 0, "ServerAction: getInventoryItemsAction lists items catalog");
     }
   }
 

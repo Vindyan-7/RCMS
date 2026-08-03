@@ -140,6 +140,27 @@ export async function getActiveMembershipAction(
   }
 }
 
+/**
+ * Batch version — one DB round-trip for all members.
+ * Returns a Record<memberId, MembershipSelect> map.
+ */
+export async function getAllActiveMembershipsAction(
+  memberIds: string[]
+): Promise<ApiResponse<Record<string, MembershipSelect>>> {
+  logger.debug("[Action: getAllActiveMembershipsAction] Initiating", { count: memberIds.length });
+  try {
+    const actor = await getActorContext();
+    Authorizer.hasPermission(actor, PERMISSIONS.MEMBERS_VIEW);
+
+    const map = await membershipsRepo.findAllActiveMemberships(memberIds);
+
+    return { success: true, data: map };
+  } catch (error) {
+    logger.error("[Action: getAllActiveMembershipsAction] Failed", error);
+    return formatErrorResponse(error);
+  }
+}
+
 export async function getMembershipHistoryAction(
   memberId: string
 ): Promise<ApiResponse<MembershipSelect[]>> {
@@ -232,6 +253,83 @@ export async function renewMembershipAction(
     return { success: true, data: renewed };
   } catch (error) {
     logger.error("[Action: renewMembershipAction] Failed", error);
+    return formatErrorResponse(error);
+  }
+}
+
+export async function bulkRenewMembershipsAction(
+  memberIds: string[]
+): Promise<ApiResponse<{ renewedCount: number; skippedCount: number; activeSemesterName: string }>> {
+  logger.info("[Action: bulkRenewMembershipsAction] Initiating bulk renewal", { count: memberIds.length });
+  try {
+    const actor = await getActorContext();
+    Authorizer.hasPermission(actor, PERMISSIONS.MEMBERS_EDIT);
+
+    const activeSemester = await semestersRepo.findActive();
+    if (!activeSemester) {
+      return {
+        success: false,
+        error: {
+          code: "NO_ACTIVE_SEMESTER",
+          message: "There is no active semester to renew memberships into. Please activate a semester first.",
+        },
+      };
+    }
+
+    let renewedCount = 0;
+    let skippedCount = 0;
+
+    for (const memberId of memberIds) {
+      const currentMembership = await membershipsRepo.findActiveMembership(memberId);
+      if (
+        currentMembership &&
+        currentMembership.semesterId === activeSemester.id &&
+        currentMembership.status === "active"
+      ) {
+        skippedCount++;
+        continue;
+      }
+
+      if (currentMembership) {
+        await membershipsRepo.update(
+          currentMembership.id,
+          { status: "past", exitDate: new Date() },
+          actor.id
+        );
+      }
+
+      await membershipsRepo.create(
+        {
+          memberId,
+          academicYearId: activeSemester.academicYearId,
+          semesterId: activeSemester.id,
+          status: "active",
+          joinDate: new Date(),
+          createdBy: actor.id,
+          updatedBy: actor.id,
+        },
+        actor.id
+      );
+
+      renewedCount++;
+    }
+
+    logger.info("[Action: bulkRenewMembershipsAction] Bulk renewal completed", {
+      renewedCount,
+      skippedCount,
+      activeSemesterId: activeSemester.id,
+    });
+
+    return {
+      success: true,
+      data: {
+        renewedCount,
+        skippedCount,
+        activeSemesterName: activeSemester.name,
+      },
+    };
+  } catch (error) {
+    logger.error("[Action: bulkRenewMembershipsAction] Failed", error);
     return formatErrorResponse(error);
   }
 }

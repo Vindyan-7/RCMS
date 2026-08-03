@@ -7,7 +7,7 @@ import { MembersRepository } from "@/repositories/members/members.repository";
 import { MembershipsRepository } from "@/repositories/members/memberships.repository";
 import { MemberSelect, MemberInsert, MembershipSelect } from "@/db/schema";
 import { UUID, PaginationQuery } from "@/core/types";
-import { PaginatedResult } from "@/core/repository/repository.types";
+import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
 import { ConflictError, NotFoundError } from "@/core/errors";
 import { logger } from "@/core/logger";
 
@@ -126,13 +126,17 @@ export class MembersService extends BaseService<
 
   public async searchMembers(
     query: string,
-    pagination: PaginationQuery
+    pagination: PaginationQuery,
+    options?: QueryOptions
   ): Promise<PaginatedResult<MemberSelect>> {
     logger.debug("[MembersService] Performing member search", { query, pagination });
-    return this.membersRepo.findAll({
-      ...pagination,
-      search: query,
-    });
+    return this.membersRepo.findAll(
+      {
+        ...pagination,
+        search: query,
+      },
+      options
+    );
   }
 
   public async archiveMember(id: UUID, actorId: UUID): Promise<boolean> {

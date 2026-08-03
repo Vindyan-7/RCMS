@@ -4,7 +4,7 @@
  * Communication Infrastructure Platform Client Component
  */
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import {
   sendNotificationAction,
   broadcastNotificationAction,
@@ -12,7 +12,12 @@ import {
   getTemplatesAction,
   getAllNotificationsAction,
 } from "@/actions/communication";
-import { NotificationSelect, NotificationTemplateSelect } from "@/db/schema";
+import {
+  getSemesterContextMetadataAction,
+  getEnrolledMembersForActiveSemesterAction,
+} from "@/actions/members/semesters.actions";
+import { SemesterContextMetadata } from "@/services/academic/semester-context.service";
+import { NotificationSelect, NotificationTemplateSelect, MemberSelect } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +34,7 @@ import {
   Radio,
   CheckCircle2,
   Clock,
+  AlertTriangle,
 } from "lucide-react";
 
 interface CommunicationClientProps {
@@ -44,6 +50,21 @@ export function CommunicationClient({
   const [templatesList, setTemplatesList] = useState<NotificationTemplateSelect[]>(initialTemplates);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"broadcast" | "templates" | "logs">("broadcast");
+
+  const [semesterContext, setSemesterContext] = useState<SemesterContextMetadata | null>(null);
+  const [enrolledMembers, setEnrolledMembers] = useState<MemberSelect[]>([]);
+
+  useEffect(() => {
+    async function loadContext() {
+      const [metaRes, membersRes] = await Promise.all([
+        getSemesterContextMetadataAction(),
+        getEnrolledMembersForActiveSemesterAction(),
+      ]);
+      if (metaRes.success && metaRes.data) setSemesterContext(metaRes.data);
+      if (membersRes.success && membersRes.data) setEnrolledMembers(membersRes.data);
+    }
+    loadContext();
+  }, []);
 
   // Modals
   const [isSendOpen, setIsSendOpen] = useState(false);
@@ -159,6 +180,30 @@ export function CommunicationClient({
 
   return (
     <div className="space-y-6 text-left">
+      {/* Semester Roster Operational Boundary Banner */}
+      {semesterContext && !semesterContext.isOperationAllowed ? (
+        <div className="rounded-2xl border border-amber-800/40 bg-amber-950/20 p-4 text-amber-300 text-xs flex items-center space-x-3 shadow-sm">
+          <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />
+          <div>
+            <div className="font-bold text-sm">No Active Semester</div>
+            <div className="text-muted-foreground mt-0.5">
+              Activate a semester in Semester Management to enable communication broadcasts and notifications.
+            </div>
+          </div>
+        </div>
+      ) : semesterContext && enrolledMembers.length === 0 ? (
+        <div className="rounded-2xl border border-amber-800/40 bg-amber-950/20 p-4 text-amber-300 text-xs flex items-center space-x-3 shadow-sm">
+          <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />
+          <div>
+            <div className="font-bold text-sm">
+              Active Semester: {semesterContext.activeSemester?.name} — 0 Enrolled Members
+            </div>
+            <div className="text-muted-foreground mt-0.5">
+              No members enrolled yet. Please go to <span className="font-semibold text-foreground">Semester Management → Member Enrollment</span> to enroll members into the active semester.
+            </div>
+          </div>
+        </div>
+      ) : null}
       {/* Controls & Tab Bar */}
       <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <div className="flex items-center space-x-3 border-b border-border text-sm font-semibold">

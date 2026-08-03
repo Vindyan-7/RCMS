@@ -5,6 +5,8 @@
 import { pgTable, uuid, varchar, date, time, integer } from "drizzle-orm/pg-core";
 import { baseColumns } from "./base";
 
+import { semesters } from "./semesters";
+
 export const attendanceSessions = pgTable("attendance_sessions", {
   title: varchar("title", { length: 100 }).notNull(),
   date: date("date", { mode: "date" }).notNull(),
@@ -14,6 +16,7 @@ export const attendanceSessions = pgTable("attendance_sessions", {
   lateThreshold: integer("late_threshold").default(15).notNull(), // Minutes
   latePoints: integer("late_points").default(5).notNull(),
   status: varchar("status", { length: 20 }).default("draft").notNull(), // draft, scheduled, active, paused, closed, archived
+  semesterId: uuid("semester_id").references(() => semesters.id, { onDelete: "restrict" }),
   ...baseColumns,
 });
 

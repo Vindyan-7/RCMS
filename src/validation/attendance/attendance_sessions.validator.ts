@@ -8,8 +8,8 @@ import { IValidationPipeline } from "@/core/service/service.types";
 export const createAttendanceSessionSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters").max(100, "Title cannot exceed 100 characters"),
   date: z.coerce.date(),
-  startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)(:([0-5]\d))?$/, "Invalid start time format (HH:mm:ss)"),
-  endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)(:([0-5]\d))?$/, "Invalid end time format (HH:mm:ss)"),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)(:([0-5]\d))?$/, "Invalid start time format (HH:mm:ss)").default("00:00:00").optional(),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)(:([0-5]\d))?$/, "Invalid end time format (HH:mm:ss)").default("23:59:59").optional(),
   attendancePoints: z.number().int().positive().default(10).optional(),
   lateThreshold: z.number().int().nonnegative().default(15).optional(),
   latePoints: z.number().int().nonnegative().default(5).optional(),

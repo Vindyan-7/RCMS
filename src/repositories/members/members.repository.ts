@@ -117,20 +117,23 @@ export class MembersRepository extends BaseRepository<
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [items, totalRes] = await Promise.all([
-      db
-        .select()
-        .from(members)
-        .where(whereClause)
-        .limit(limit)
-        .offset(offset),
-      db
+    const includeCount = options?.includeCount ?? true;
+
+    const items = await db
+      .select()
+      .from(members)
+      .where(whereClause)
+      .limit(limit)
+      .offset(offset);
+
+    let total = items.length;
+    if (includeCount) {
+      const totalRes = await db
         .select({ count: sql<number>`count(*)` })
         .from(members)
-        .where(whereClause),
-    ]);
-
-    const total = Number(totalRes[0]?.count || 0);
+        .where(whereClause);
+      total = Number(totalRes[0]?.count || 0);
+    }
 
     return {
       items,
@@ -141,17 +144,49 @@ export class MembersRepository extends BaseRepository<
     };
   }
 
+  public async getNextMemberId(yearCode?: string): Promise<string> {
+    if (!yearCode) {
+      const currentYear = new Date().getFullYear();
+      yearCode = String(currentYear).slice(-2);
+    }
+    const prefix = `SAC-RC-${yearCode}`;
+    const result = await db
+      .select({ memberId: members.memberId })
+      .from(members)
+      .where(sql`${members.memberId} LIKE ${prefix + '%'}`)
+      .orderBy(sql`LENGTH(${members.memberId}) DESC`, sql`${members.memberId} DESC`)
+      .limit(1);
+
+    if (!result[0] || !result[0].memberId) {
+      return `${prefix}001`;
+    }
+
+    const lastId = result[0].memberId;
+    const seqStr = lastId.replace(prefix, "");
+    const lastSeq = parseInt(seqStr, 10);
+    const nextSeq = isNaN(lastSeq) ? 1 : lastSeq + 1;
+    const paddedSeq = String(nextSeq).padStart(3, "0");
+    return `${prefix}${paddedSeq}`;
+  }
+
   public async create(data: MemberInsert, creatorId: UUID): Promise<MemberSelect> {
     const audit = this.getAuditFields(creatorId, "create");
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const randomSac = Math.floor(100000 + Math.random() * 900000);
+    let yearCode = String(new Date().getFullYear()).slice(-2);
+    if (data.academicYear) {
+      const match = data.academicYear.match(/\d{4}/);
+      if (match) yearCode = match[0].slice(-2);
+    }
+
+    const generatedMemberId = data.memberId && data.memberId.startsWith("SAC-RC-")
+      ? data.memberId
+      : await this.getNextMemberId(yearCode);
 
     const payload = {
       ...data,
-      memberId: data.memberId || `MEM-2026-${randomSuffix}`,
-      clubMembershipId: data.clubMembershipId || `SAC-RC-${randomSac}`,
+      memberId: generatedMemberId,
+      clubMembershipId: data.clubMembershipId || generatedMemberId,
       role: data.role || "Member",
-      joinedDate: data.joinedDate || new Date(),
+      joinedDate: data.joinedDate ? String(data.joinedDate) : new Date().toISOString().split("T")[0],
       ...audit,
     };
 

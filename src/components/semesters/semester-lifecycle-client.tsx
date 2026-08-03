@@ -10,7 +10,7 @@
  *  - View full membership history per member
  */
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition } from "react";
 import {
   getAllSemestersAction,
   createSemesterAction,
@@ -20,11 +20,12 @@ import {
 } from "@/actions/members/semesters.actions";
 import {
   renewMembershipAction,
+  bulkRenewMembershipsAction,
   getMembershipHistoryAction,
-  getActiveMembershipAction,
 } from "@/actions/members/memberships.actions";
 import { searchMembersAction } from "@/actions/members/members.actions";
-import { SemesterSelect, MemberSelect, MembershipSelect } from "@/db/schema";
+import { createAcademicYearAction } from "@/actions/academic/academic_years.actions";
+import { SemesterSelect, MemberSelect, MembershipSelect, AcademicYearSelect } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +48,8 @@ import {
 interface SemesterClientProps {
   initialSemesters: SemesterSelect[];
   initialMembers: MemberSelect[];
+  academicYears: AcademicYearSelect[];
+  initialActiveMemberships: Record<string, MembershipSelect>;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -86,9 +89,10 @@ function fmtDate(d: Date | string | null | undefined): string {
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
-export function SemesterLifecycleClient({ initialSemesters, initialMembers }: SemesterClientProps) {
+export function SemesterLifecycleClient({ initialSemesters, initialMembers, academicYears: initialAcademicYears, initialActiveMemberships }: SemesterClientProps) {
   const [semesters, setSemesters] = useState<SemesterSelect[]>(initialSemesters);
   const [members, setMembers] = useState<MemberSelect[]>(initialMembers);
+  const [academicYears, setAcademicYears] = useState<AcademicYearSelect[]>(initialAcademicYears);
   const [activeTab, setActiveTab] = useState<"semesters" | "memberships">("semesters");
 
   // Semester form
@@ -101,48 +105,73 @@ export function SemesterLifecycleClient({ initialSemesters, initialMembers }: Se
   const [semRegEnd, setSemRegEnd] = useState("");
   const [semStatus, setSemStatus] = useState("upcoming");
 
-  // Member membership states
-  const [memberActiveMemberships, setMemberActiveMemberships] = useState<Record<string, MembershipSelect | null>>({});
+  // Member membership states — seeded from server-side batch fetch (no client-side waterfall)
+  const [memberActiveMemberships, setMemberActiveMemberships] = useState<Record<string, MembershipSelect | null>>(initialActiveMemberships);
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [memberHistory, setMemberHistory] = useState<Record<string, MembershipSelect[]>>({});
   const [renewingId, setRenewingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
 
   const activeSemester = semesters.find((s) => s.status === "active");
 
-  // ── Load active memberships for all members on mount ─────────────────────
-  useEffect(() => {
-    const load = async () => {
-      const results: Record<string, MembershipSelect | null> = {};
-      await Promise.all(
-        members.map(async (m) => {
-          const res = await getActiveMembershipAction(m.id);
-          results[m.id] = res.success ? res.data ?? null : null;
-        })
-      );
-      setMemberActiveMemberships(results);
-    };
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [members]);
+  const enrolledCount = Object.values(memberActiveMemberships).filter(
+    (mem) => mem && activeSemester && mem.semesterId === activeSemester.id && mem.status === "active"
+  ).length;
 
   const showFeedback = (type: "ok" | "err", msg: string) => {
     setFeedback({ type, msg });
     setTimeout(() => setFeedback(null), 4000);
   };
 
+  const handleToggleSelectMember = (id: string) => {
+    setSelectedMemberIds((prev) =>
+      prev.includes(id) ? prev.filter((mId) => mId !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllMembers = (filtered: MemberSelect[]) => {
+    if (selectedMemberIds.length === filtered.length && filtered.length > 0) {
+      setSelectedMemberIds([]);
+    } else {
+      setSelectedMemberIds(filtered.map((m) => m.id));
+    }
+  };
+
+  const handleBulkEnroll = async () => {
+    if (selectedMemberIds.length === 0) return;
+    if (!activeSemester) {
+      showFeedback("err", "No Active Semester! Please activate a semester before enrolling members.");
+      return;
+    }
+    if (!confirm(`Enroll ${selectedMemberIds.length} selected member(s) into active semester "${activeSemester.name}"?`)) return;
+
+    startTransition(async () => {
+      const res = await bulkRenewMembershipsAction(selectedMemberIds);
+      if (res.success && res.data) {
+        showFeedback("ok", `Enrolled ${res.data.renewedCount} member(s) into "${res.data.activeSemesterName}". (${res.data.skippedCount} already active)`);
+        setSelectedMemberIds([]);
+        handleRefresh();
+      } else {
+        showFeedback("err", res.error?.message || "Bulk enrollment failed.");
+      }
+    });
+  };
+
   // ── Refresh ───────────────────────────────────────────────────────────────
   const handleRefresh = () => {
     startTransition(async () => {
-      const [semRes, memRes] = await Promise.all([
-        getAllSemestersAction(),
-        searchMembersAction("", { limit: 1000 }),
-      ]);
-      if (semRes.success && semRes.data) setSemesters(semRes.data.items);
-      if (memRes.success && memRes.data) setMembers(memRes.data.items);
+      const { getSemesterDashboardDataAction } = await import("@/actions/members/semesters.actions");
+      const res = await getSemesterDashboardDataAction();
+      if (res.success && res.data) {
+        setSemesters(res.data.semesters);
+        setMembers(res.data.members);
+        setAcademicYears(res.data.academicYears);
+        setMemberActiveMemberships(res.data.activeMemberships);
+      }
     });
   };
 
@@ -343,12 +372,18 @@ export function SemesterLifecycleClient({ initialSemesters, initialMembers }: Se
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase text-muted-foreground">Academic Year ID *</label>
-                    <input
+                    <label className="text-[11px] font-bold uppercase text-muted-foreground">Academic Year *</label>
+                    <select
                       required value={semAcYear} onChange={(e) => setSemAcYear(e.target.value)}
-                      placeholder="UUID of academic year"
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none font-mono"
-                    />
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                    >
+                      <option value="">— Select academic year —</option>
+                      {academicYears.map((ay) => (
+                        <option key={ay.id} value={ay.id}>
+                          Academic Year {ay.name} ({fmtDate(ay.startDate)} - {fmtDate(ay.endDate)})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold uppercase text-muted-foreground">Start Date *</label>
@@ -468,20 +503,69 @@ export function SemesterLifecycleClient({ initialSemesters, initialMembers }: Se
         {/* ── MEMBERSHIPS TAB ───────────────────────────────────────────── */}
         {activeTab === "memberships" && (
           <div className="space-y-4">
-            {/* Search */}
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name, roll number, member ID or club ID…"
-              className="w-full rounded-xl border border-input bg-background/60 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
+            {/* Active Semester Banner */}
+            {activeSemester ? (
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border border-emerald-800/40 bg-emerald-950/20 text-xs">
+                <div className="flex items-center space-x-3">
+                  <GraduationCap className="h-5 w-5 text-emerald-400 shrink-0" />
+                  <div>
+                    <div className="font-semibold text-emerald-300 text-sm">
+                      Active Semester: {activeSemester.name}
+                    </div>
+                    <div className="text-muted-foreground mt-0.5">
+                      Members Enrolled: <span className="font-mono text-emerald-400 font-bold">{enrolledCount}</span> of {members.length} Total Registered Members
+                    </div>
+                  </div>
+                </div>
+
+                {selectedMemberIds.length > 0 && (
+                  <Button
+                    size="sm"
+                    onClick={handleBulkEnroll}
+                    disabled={isPending}
+                    className="flex items-center space-x-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white shrink-0"
+                  >
+                    <RotateCcw className={`h-3.5 w-3.5 ${isPending ? "animate-spin" : ""}`} />
+                    <span>Bulk Enroll Selected ({selectedMemberIds.length})</span>
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center space-x-3 p-4 rounded-xl border border-amber-800/40 bg-amber-950/20 text-xs text-amber-300">
+                <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />
+                <div>
+                  <div className="font-semibold text-sm">No Active Semester</div>
+                  <div className="text-muted-foreground mt-0.5">
+                    Activate a semester in the <span className="font-semibold text-foreground">Semesters Lifecycle</span> tab above to begin enrolling members into operational rosters.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Search Bar */}
+            <div className="flex items-center space-x-3">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, roll number, member ID or club ID…"
+                className="w-full rounded-xl border border-input bg-background/60 px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
 
             {/* Table */}
             <div className="overflow-x-auto rounded-xl border border-border/80 bg-background/40">
               <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
                 <thead className="border-b border-border bg-muted/30 font-semibold uppercase tracking-wider text-[11px] text-muted-foreground">
                   <tr>
+                    <th className="px-3 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selectedMemberIds.length === filteredMembers.length && filteredMembers.length > 0}
+                        onChange={() => handleSelectAllMembers(filteredMembers)}
+                        className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
+                      />
+                    </th>
                     <th className="px-4 py-3">MEMBER</th>
                     <th className="px-4 py-3">MEMBER ID</th>
                     <th className="px-4 py-3">CURRENT MEMBERSHIP</th>
@@ -493,7 +577,7 @@ export function SemesterLifecycleClient({ initialSemesters, initialMembers }: Se
                 <tbody className="divide-y divide-border/40">
                   {filteredMembers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No members found.</td>
+                      <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No members found.</td>
                     </tr>
                   ) : (
                     filteredMembers.map((member) => {
@@ -505,10 +589,19 @@ export function SemesterLifecycleClient({ initialSemesters, initialMembers }: Se
                         activeSemester &&
                         activeMem.semesterId === activeSemester.id &&
                         activeMem.status === "active";
+                      const isSelected = selectedMemberIds.includes(member.id);
 
                       return (
                         <>
-                          <tr key={member.id} className="hover:bg-accent/30 transition-colors">
+                          <tr key={member.id} className={`hover:bg-accent/30 transition-colors ${isSelected ? "bg-primary/5" : ""}`}>
+                            <td className="px-3 py-3">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => handleToggleSelectMember(member.id)}
+                                className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
+                              />
+                            </td>
                             <td className="px-4 py-3">
                               <div className="font-semibold text-foreground">{member.name}</div>
                               <div className="text-[10px] text-muted-foreground">{member.rollNumber}</div>

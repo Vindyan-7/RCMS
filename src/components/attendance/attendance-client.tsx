@@ -4,7 +4,7 @@
  * Attendance & Volunteer Authentication Client Component
  */
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useCallback } from "react";
 import {
   createAttendanceSessionAction,
   openAttendanceSessionAction,
@@ -22,8 +22,14 @@ import {
   recordAttendanceAction,
   getAttendanceRecordsAction,
   exportAttendanceRecordsCsvAction,
+  bulkRecordAttendanceAction,
 } from "@/actions/attendance/attendance_records.actions";
-import { AttendanceSessionSelect, AttendanceRecordSelect, VolunteerCodeSelect } from "@/db/schema";
+import {
+  getSemesterContextMetadataAction,
+  getEnrolledMembersForActiveSemesterAction,
+} from "@/actions/members/semesters.actions";
+import { SemesterContextMetadata } from "@/services/academic/semester-context.service";
+import { AttendanceSessionSelect, AttendanceRecordSelect, VolunteerCodeSelect, MemberSelect } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +50,8 @@ import {
   Clock,
   Ribbon,
   Copy,
+  AlertTriangle,
+  Search,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -56,13 +64,35 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
   const [sessions, setSessions] = useState<AttendanceSessionSelect[]>(initialSessions);
   const [records, setRecords] = useState<AttendanceRecordSelect[]>(initialRecords);
 
+  const [semesterContext, setSemesterContext] = useState<SemesterContextMetadata | null>(null);
+  const [enrolledMembers, setEnrolledMembers] = useState<MemberSelect[]>([]);
+  const [isPending, startTransition] = useTransition();
+
+  const refreshSessionsAndRecords = useCallback(async () => {
+    startTransition(async () => {
+      const [sessRes, recsRes, metaRes, membersRes] = await Promise.all([
+        getAttendanceSessionsAction(),
+        getAttendanceRecordsAction(),
+        getSemesterContextMetadataAction(),
+        getEnrolledMembersForActiveSemesterAction(),
+      ]);
+      if (sessRes.success && sessRes.data) setSessions(sessRes.data.items);
+      if (recsRes.success && recsRes.data) setRecords(recsRes.data.items);
+      if (metaRes.success && metaRes.data) setSemesterContext(metaRes.data);
+      if (membersRes.success && membersRes.data) setEnrolledMembers(membersRes.data);
+    });
+  }, []);
+
+  // Phase 1: Auto-fetch fresh data when page is opened / mounted
+  useEffect(() => {
+    refreshSessionsAndRecords();
+  }, [refreshSessionsAndRecords]);
+
   // Top navigation view mode
   const [activeTab, setActiveTab] = useState<"admin" | "history">("admin");
 
   // Alert banner state
-  const [alertMessage, setAlertMessage] = useState<string | null>(
-    "Attendance session opened and activated for tracking!"
-  );
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   // Modal & Dialog controller states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -73,12 +103,9 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
   const [sessionPins, setSessionPins] = useState<VolunteerCodeSelect[]>([]);
   const [volunteerPIN, setVolunteerPIN] = useState("");
   const [authenticatedSessionId, setAuthenticatedSessionId] = useState<string | null>(null);
-
-  const [isPending, startTransition] = useTransition();
-
   // Create Session Form Fields
   const [title, setTitle] = useState("");
-  const [dateVal, setDateVal] = useState("2026-08-10");
+  const [dateVal, setDateVal] = useState(new Date().toISOString().split("T")[0]);
   const [startTime, setStartTime] = useState("14:00");
   const [endTime, setEndTime] = useState("16:00");
   const [points, setPoints] = useState(15);
@@ -90,38 +117,96 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
   const [scanMethod, setScanMethod] = useState("manual");
   const [scanRemarks, setScanRemarks] = useState("");
 
-  const refreshSessionsAndRecords = async () => {
-    startTransition(async () => {
-      const sessRes = await getAttendanceSessionsAction();
-      const recsRes = await getAttendanceRecordsAction();
-      if (sessRes.success && sessRes.data) {
-        setSessions(sessRes.data.items);
+  const [attendanceMode, setAttendanceMode] = useState<"live" | "late">("live");
+  const [activeAttendanceSession, setActiveAttendanceSession] = useState<AttendanceSessionSelect | null>(null);
+  const [checkedMemberIds, setCheckedMemberIds] = useState<Set<string>>(new Set());
+  const [attendanceSearch, setAttendanceSearch] = useState("");
+
+  const handleOpenAttendanceScreen = (session: AttendanceSessionSelect) => {
+    setActiveAttendanceSession(session);
+    const existingForSession = new Set(
+      records.filter((r) => r.sessionId === session.id).map((r) => r.memberId)
+    );
+    setCheckedMemberIds(existingForSession);
+  };
+
+  const toggleMemberCheck = (memberId: string) => {
+    setCheckedMemberIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(memberId)) {
+        next.delete(memberId);
+      } else {
+        next.add(memberId);
       }
-      if (recsRes.success && recsRes.data) {
-        setRecords(recsRes.data.items);
+      return next;
+    });
+  };
+
+  const handleSaveBulkAttendance = async () => {
+    if (!activeAttendanceSession) return;
+    startTransition(async () => {
+      const res = await bulkRecordAttendanceAction(
+        activeAttendanceSession.id,
+        Array.from(checkedMemberIds)
+      );
+
+      if (res.success) {
+        setAlertMessage(`Attendance Saved Successfully for ${activeAttendanceSession.title}!`);
+        refreshSessionsAndRecords();
+      } else {
+        alert(res.error?.message || "Failed to save attendance");
       }
     });
   };
 
+  const filteredEnrolledMembers = enrolledMembers.filter((m) => {
+    if (!attendanceSearch.trim()) return true;
+    const q = attendanceSearch.toLowerCase();
+    const name = (m.name || "").toLowerCase();
+    const roll = (m.rollNumber || "").toLowerCase();
+    const clubId = (m.clubMembershipId || "").toLowerCase();
+    const memId = (m.memberId || "").toLowerCase();
+
+    return name.includes(q) || roll.includes(q) || clubId.includes(q) || memId.includes(q);
+  });
+
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(async () => {
-      const res = await createAttendanceSessionAction({
+      const status = attendanceMode === "live" ? "upcoming" : "completed";
+      const payload: any = {
         title,
         date: new Date(dateVal).toISOString(),
-        startTime: `${startTime}:00`,
-        endTime: `${endTime}:00`,
         attendancePoints: points,
-        lateThreshold,
-        latePoints,
-        status: "active",
-      });
+        status,
+      };
+
+      if (attendanceMode === "live") {
+        payload.startTime = `${startTime}:00`;
+        payload.endTime = `${endTime}:00`;
+        payload.lateThreshold = lateThreshold;
+        payload.latePoints = latePoints;
+      } else {
+        payload.startTime = "00:00:00";
+        payload.endTime = "23:59:59";
+      }
+
+      const res = await createAttendanceSessionAction(payload);
 
       if (res.success && res.data) {
         setIsCreateOpen(false);
         setTitle("");
-        setAlertMessage(`Attendance session '${res.data.title}' opened and activated for tracking!`);
+        setAlertMessage(
+          attendanceMode === "live"
+            ? `Upcoming Live Attendance session '${res.data.title}' created.`
+            : `Late Attendance session '${res.data.title}' created. Ready for attendance recording!`
+        );
         refreshSessionsAndRecords();
+
+        // Phase 2: Late Attendance auto-navigates immediately to Take Attendance Screen without PIN/Volunteer prompts
+        if (attendanceMode === "late") {
+          handleOpenAttendanceScreen(res.data);
+        }
       } else {
         alert(res.error?.message || "Failed to create session");
       }
@@ -271,6 +356,52 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
     });
   };
 
+  // ── Phase 2 Guard: No Active Semester ──────────────────────────────────────
+  if (semesterContext && !semesterContext.isOperationAllowed) {
+    return (
+      <div className="rounded-2xl border border-amber-800/40 bg-amber-950/20 p-8 text-amber-300 space-y-4 max-w-xl mx-auto my-12 text-center shadow-lg">
+        <div className="flex justify-center">
+          <AlertTriangle className="h-12 w-12 text-amber-400" />
+        </div>
+        <h2 className="text-xl font-bold text-amber-200">No Active Semester</h2>
+        <p className="text-sm text-muted-foreground">
+          Attendance is unavailable until a semester is activated.
+        </p>
+        <div className="pt-2">
+          <Link href="/dashboard/semesters">
+            <Button variant="outline" className="text-xs border-amber-700/60 text-amber-300 hover:bg-amber-900/40">
+              Go to Semester Management
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Phase 3 Guard: Active Semester exists but 0 Members Enrolled ───────────
+  if (semesterContext && semesterContext.isOperationAllowed && enrolledMembers.length === 0) {
+    return (
+      <div className="rounded-2xl border border-amber-800/40 bg-amber-950/20 p-8 text-amber-300 space-y-4 max-w-xl mx-auto my-12 text-center shadow-lg">
+        <div className="flex justify-center">
+          <AlertTriangle className="h-12 w-12 text-amber-400" />
+        </div>
+        <h2 className="text-xl font-bold text-amber-200">
+          Active Semester: {semesterContext.activeSemester?.name}
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          No members are enrolled in the active semester.
+        </p>
+        <div className="pt-2">
+          <Link href="/dashboard/semesters">
+            <Button variant="outline" className="text-xs border-amber-700/60 text-amber-300 hover:bg-amber-900/40">
+              Go to Semester Management → Member Enrollment
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 text-left">
       {/* Top Header Navigation Tabs matching Screenshot 1 */}
@@ -322,7 +453,169 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
         </div>
       )}
 
-      {activeTab === "admin" ? (
+      {/* Phase 3 Reusable Attendance Screen */}
+      {activeAttendanceSession ? (
+        <div className="space-y-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
+          {/* Top Bar Header */}
+          <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 border-b border-border/60 pb-4">
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActiveAttendanceSession(null)}
+                  className="text-xs h-7 px-2 flex items-center space-x-1"
+                >
+                  <span>← Back to Sessions</span>
+                </Button>
+                <Badge variant={activeAttendanceSession.status === "active" ? "success" : "secondary"} className="text-xs uppercase font-bold">
+                  {activeAttendanceSession.status === "active" ? "Live Session" : activeAttendanceSession.status === "completed" ? "Late / Completed" : activeAttendanceSession.status}
+                </Badge>
+              </div>
+              <h2 className="text-xl font-bold text-foreground">{activeAttendanceSession.title}</h2>
+              <p className="text-xs text-muted-foreground">
+                Session Date: {new Date(activeAttendanceSession.date).toLocaleDateString()} • Awarded Points: {activeAttendanceSession.attendancePoints} Pts
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCheckedMemberIds(new Set(enrolledMembers.map((m) => m.id)))}
+                className="text-xs h-8"
+              >
+                Select All
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCheckedMemberIds(new Set())}
+                className="text-xs h-8"
+              >
+                Deselect All
+              </Button>
+              <Button
+                onClick={handleSaveBulkAttendance}
+                disabled={isPending}
+                className="text-xs h-8 bg-blue-600 hover:bg-blue-500 text-white font-bold px-4"
+              >
+                {isPending ? "Saving..." : "Save Attendance"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Smart Search Bar & Progress Indicators */}
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-xs font-semibold text-foreground">Search Enrolled Members</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={attendanceSearch}
+                  placeholder="Search by Name, Roll No, or Member ID..."
+                  onChange={(e) => setAttendanceSearch(e.target.value)}
+                  className="w-full rounded-xl border border-input bg-background pl-9 pr-4 py-2 text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-3 flex flex-col justify-between">
+              <div className="text-[11px] font-semibold text-emerald-400">Present Count</div>
+              <div className="text-xl font-bold text-emerald-300">
+                {checkedMemberIds.size} <span className="text-xs text-muted-foreground font-normal">/ {enrolledMembers.length}</span>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-3 flex flex-col justify-between">
+              <div className="flex justify-between items-center text-[11px] font-semibold text-amber-400">
+                <span>Absent Count</span>
+                <span>{enrolledMembers.length === 0 ? 0 : Math.round((checkedMemberIds.size / enrolledMembers.length) * 100)}% Complete</span>
+              </div>
+              <div className="text-xl font-bold text-amber-300">
+                {enrolledMembers.length - checkedMemberIds.size} <span className="text-xs text-muted-foreground font-normal">Absent</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full bg-muted/40 h-2 rounded-full overflow-hidden">
+            <div
+              className="bg-blue-600 h-full transition-all duration-300"
+              style={{
+                width: `${enrolledMembers.length === 0 ? 0 : (checkedMemberIds.size / enrolledMembers.length) * 100}%`,
+              }}
+            />
+          </div>
+
+          {/* Enrolled Active Semester Member Checklist Table */}
+          <div className="overflow-x-auto rounded-xl border border-border/60">
+            <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
+              <thead className="border-b border-border bg-muted/40 font-semibold uppercase tracking-wider text-[11px] text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 text-center w-12">Present</th>
+                  <th className="px-4 py-3">Member ID</th>
+                  <th className="px-4 py-3">Roll Number</th>
+                  <th className="px-4 py-3">Full Name</th>
+                  <th className="px-4 py-3">Email / Contact</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {filteredEnrolledMembers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                      No matching enrolled members found for &quot;{attendanceSearch}&quot;.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredEnrolledMembers.map((m) => {
+                    const isChecked = checkedMemberIds.has(m.id);
+                    return (
+                      <tr
+                        key={m.id}
+                        onClick={() => toggleMemberCheck(m.id)}
+                        className={`cursor-pointer transition-colors ${
+                          isChecked ? "bg-emerald-950/20 hover:bg-emerald-950/30" : "hover:bg-accent/40"
+                        }`}
+                      >
+                        <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleMemberCheck(m.id)}
+                            className="h-4 w-4 rounded border-input text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs font-semibold">{m.memberId || m.clubMembershipId || m.id.substring(0, 8)}</td>
+                        <td className="px-4 py-3 font-mono text-xs">{m.rollNumber || "N/A"}</td>
+                        <td className="px-4 py-3 font-semibold">{m.name}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{m.email || m.phone || "N/A"}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant={isChecked ? "success" : "secondary"} className="text-[10px]">
+                            {isChecked ? "Present" : "Absent"}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button
+              onClick={handleSaveBulkAttendance}
+              disabled={isPending}
+              className="text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-2 rounded-xl shadow-md"
+            >
+              {isPending ? "Saving Attendance..." : `Save Attendance (${checkedMemberIds.size} Present)`}
+            </Button>
+          </div>
+        </div>
+      ) : activeTab === "admin" ? (
         <div className="space-y-6">
           {/* Section Header Controls Bar */}
           <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
@@ -442,6 +735,7 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
                         <Button
                           size="sm"
                           variant="outline"
+                          disabled={isPending}
                           className="text-[11px] h-8 flex items-center space-x-1.5"
                           onClick={() => handlePauseSession(session.id)}
                         >
@@ -451,6 +745,7 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
                         <Button
                           size="sm"
                           variant="destructive"
+                          disabled={isPending}
                           className="text-[11px] h-8 flex items-center space-x-1.5 bg-red-600/90 hover:bg-red-600"
                           onClick={() => handleCloseSession(session.id)}
                         >
@@ -460,6 +755,7 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
                         <Button
                           size="sm"
                           variant="outline"
+                          disabled={isPending}
                           className="text-[11px] h-8 flex items-center space-x-1.5"
                           onClick={() => handleManagePINs(session)}
                         >
@@ -468,15 +764,35 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
 
                         <Button
                           size="sm"
+                          disabled={isPending}
+                          className="text-[11px] h-8 flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white"
+                          onClick={() => handleOpenAttendanceScreen(session)}
+                        >
+                          <UserCheck className="h-3.5 w-3.5" /> <span>Take Attendance</span>
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          disabled={isPending}
                           className="text-[11px] h-8 flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-500 text-white"
                           onClick={() => {
                             setSelectedSession(session);
                             setIsAuthOpen(true);
                           }}
                         >
-                          <UserCheck className="h-3.5 w-3.5" /> <span>Authenticate</span>
+                          <Key className="h-3.5 w-3.5" /> <span>Authenticate</span>
                         </Button>
                       </>
+                    )}
+
+                    {session.status === "completed" && (
+                      <Button
+                        size="sm"
+                        className="text-[11px] h-8 flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white w-full"
+                        onClick={() => handleOpenAttendanceScreen(session)}
+                      >
+                        <UserCheck className="h-3.5 w-3.5" /> <span>Take / Edit Attendance</span>
+                      </Button>
                     )}
 
                     {session.status === "paused" && (
@@ -596,6 +912,58 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
               </Button>
             </div>
 
+            {/* Attendance Mode Selector */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-foreground uppercase tracking-wide">Attendance Mode</label>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <label
+                  className={`flex flex-col p-3 rounded-xl border cursor-pointer transition-all ${
+                    attendanceMode === "live"
+                      ? "border-primary bg-primary/10 text-primary font-semibold shadow-sm"
+                      : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="attendanceMode"
+                      value="live"
+                      checked={attendanceMode === "live"}
+                      onChange={() => setAttendanceMode("live")}
+                      className="text-primary focus:ring-primary"
+                    />
+                    <span>Live Attendance</span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground mt-1 font-normal">
+                    Real-time tracking during event using volunteers/PIN.
+                  </span>
+                </label>
+
+                <label
+                  className={`flex flex-col p-3 rounded-xl border cursor-pointer transition-all ${
+                    attendanceMode === "late"
+                      ? "border-primary bg-primary/10 text-primary font-semibold shadow-sm"
+                      : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="attendanceMode"
+                      value="late"
+                      checked={attendanceMode === "late"}
+                      onChange={() => setAttendanceMode("late")}
+                      className="text-primary focus:ring-primary"
+                    />
+                    <span>Late Attendance</span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground mt-1 font-normal">
+                    Entered afterward for missed or paper-based sessions.
+                  </span>
+                </label>
+              </div>
+            </div>
+
             <form onSubmit={handleCreateSession} className="space-y-4 text-left">
               <div className="space-y-1">
                 <label className="text-xs font-semibold">Session Title</label>
@@ -610,42 +978,80 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold">Date</label>
+                <label className="text-xs font-semibold">
+                  {attendanceMode === "live" ? "Session Date (Today or Future)" : "Attendance Date"}
+                </label>
                 <input
                   type="date"
                   required
                   value={dateVal}
+                  min={attendanceMode === "live" ? new Date().toISOString().split("T")[0] : semesterContext?.activeSemester?.startDate ? new Date(semesterContext.activeSemester.startDate).toISOString().split("T")[0] : undefined}
+                  max={attendanceMode === "late" && semesterContext?.activeSemester?.endDate ? new Date(semesterContext.activeSemester.endDate).toISOString().split("T")[0] : undefined}
                   onChange={(e) => setDateVal(e.target.value)}
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
                 />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold">Start Time</label>
-                  <input
-                    type="time"
-                    required
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold">End Time</label>
-                  <input
-                    type="time"
-                    required
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
+              {attendanceMode === "live" && (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold">Start Time</label>
+                      <input
+                        type="time"
+                        required
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold">End Time</label>
+                      <input
+                        type="time"
+                        required
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold">Points</label>
+                      <input
+                        type="number"
+                        value={points}
+                        onChange={(e) => setPoints(Number(e.target.value))}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold">Late Threshold (Min)</label>
+                      <input
+                        type="number"
+                        value={lateThreshold}
+                        onChange={(e) => setLateThreshold(Number(e.target.value))}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold">Late Pts</label>
+                      <input
+                        type="number"
+                        value={latePoints}
+                        onChange={(e) => setLatePoints(Number(e.target.value))}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {attendanceMode === "late" && (
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold">Points</label>
+                  <label className="text-xs font-semibold">Points Awarded</label>
                   <input
                     type="number"
                     value={points}
@@ -653,28 +1059,10 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
                     className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold">Late Threshold (Min)</label>
-                  <input
-                    type="number"
-                    value={lateThreshold}
-                    onChange={(e) => setLateThreshold(Number(e.target.value))}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold">Late Pts</label>
-                  <input
-                    type="number"
-                    value={latePoints}
-                    onChange={(e) => setLatePoints(Number(e.target.value))}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
+              )}
 
               <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white" disabled={isPending}>
-                {isPending ? "Creating..." : "Save Session"}
+                {isPending ? "Saving..." : attendanceMode === "live" ? "Create Live Session" : "Create Late Session"}
               </Button>
             </form>
           </div>

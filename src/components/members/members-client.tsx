@@ -11,6 +11,7 @@ import {
   archiveMemberAction,
   searchMembersAction,
   importMembersCsvAction,
+  bulkRenewMembershipsAction,
 } from "@/actions/members";
 import { awardPointsAction, getMemberScoreAction } from "@/actions/points";
 import { sendNotificationAction } from "@/actions/communication";
@@ -33,6 +34,8 @@ import {
   MessageSquare,
   Activity,
   ArrowUpRight,
+  RotateCcw,
+  CheckSquare,
 } from "lucide-react";
 
 interface MembersClientProps {
@@ -42,6 +45,7 @@ interface MembersClientProps {
 export function MembersClient({ initialMembers }: MembersClientProps) {
   const [membersList, setMembersList] = useState<MemberSelect[]>(initialMembers);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 
   // Filter States
   const [branchFilter, setBranchFilter] = useState("all");
@@ -126,6 +130,36 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
     });
   };
 
+  const toggleSelectAll = () => {
+    if (selectedMemberIds.length === filteredMembers.length && filteredMembers.length > 0) {
+      setSelectedMemberIds([]);
+    } else {
+      setSelectedMemberIds(filteredMembers.map((m) => m.id));
+    }
+  };
+
+  const toggleSelectMember = (id: string) => {
+    setSelectedMemberIds((prev) =>
+      prev.includes(id) ? prev.filter((mId) => mId !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkRenew = async () => {
+    if (selectedMemberIds.length === 0) return;
+    if (!confirm(`Renew membership into Active Semester for ${selectedMemberIds.length} selected member(s)?`)) return;
+
+    startTransition(async () => {
+      const res = await bulkRenewMembershipsAction(selectedMemberIds);
+      if (res.success && res.data) {
+        alert(`Bulk Renewal Result:\n• ${res.data.renewedCount} member(s) renewed into active semester "${res.data.activeSemesterName}"\n• ${res.data.skippedCount} member(s) already active in current semester`);
+        setSelectedMemberIds([]);
+        handleRefresh();
+      } else {
+        alert(res.error?.message || "Failed to renew memberships.");
+      }
+    });
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(async () => {
@@ -205,10 +239,13 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
       startTransition(async () => {
         const res = await importMembersCsvAction(csvContent);
         if (res.success && res.data) {
-          alert(`CSV Import Complete!\nImported: ${res.data.imported} records\nSkipped/Errors: ${res.data.skipped}`);
+          const errList = res.data.errors.length > 0 
+            ? `\n\nError Summary (${res.data.errors.length}):\n` + res.data.errors.slice(0, 5).join("\n") + (res.data.errors.length > 5 ? `\n...and ${res.data.errors.length - 5} more` : "")
+            : "";
+          alert(`CSV Import Completed!\n\n✅ Successfully Imported: ${res.data.imported} members\n⚠️ Skipped/Failed: ${res.data.skipped}${errList}`);
           handleRefresh();
         } else {
-          alert(res.error?.message || "CSV import failed");
+          alert("CSV Import Failed: " + (res.error?.message || "Invalid file format or unauthorized access"));
         }
       });
     };
@@ -390,6 +427,8 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
               <span>Bulk Import CSV</span>
             </Button>
 
+
+
             <Button
               variant="outline"
               size="sm"
@@ -458,10 +497,10 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
               className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs text-foreground shadow-sm focus:border-primary focus:outline-none"
             >
               <option value="all">All</option>
-              <option value="1">Yr 1</option>
-              <option value="2">Yr 2</option>
-              <option value="3">Yr 3</option>
-              <option value="4">Yr 4</option>
+              <option value="1">1st Year</option>
+              <option value="2">2nd Year</option>
+              <option value="3">3rd Year</option>
+              <option value="4">4th Year</option>
             </select>
           </div>
 
@@ -513,6 +552,14 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
           <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
             <thead className="border-b border-border bg-muted/30 font-semibold uppercase tracking-wider text-[11px] text-muted-foreground">
               <tr>
+                <th className="px-3 py-3 w-8">
+                  <input
+                    type="checkbox"
+                    checked={selectedMemberIds.length > 0 && selectedMemberIds.length === filteredMembers.length}
+                    onChange={toggleSelectAll}
+                    className="rounded border-input text-primary focus:ring-primary"
+                  />
+                </th>
                 <th className="px-4 py-3">PHOTO</th>
                 <th className="px-4 py-3">CLUB MEMBERSHIP ID</th>
                 <th className="px-4 py-3">NAME</th>
@@ -530,13 +577,21 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
             <tbody className="divide-y divide-border/40">
               {filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={13} className="px-4 py-8 text-center text-muted-foreground">
                     No members match the current search criteria or filters.
                   </td>
                 </tr>
               ) : (
                 filteredMembers.map((member) => (
                   <tr key={member.id} className="hover:bg-accent/40 transition-colors">
+                    <td className="px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedMemberIds.includes(member.id)}
+                        onChange={() => toggleSelectMember(member.id)}
+                        className="rounded border-input text-primary focus:ring-primary"
+                      />
+                    </td>
                     {/* PHOTO Avatar Badge */}
                     <td className="px-4 py-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-950/80 font-bold text-blue-400 text-xs border border-blue-800/60 shadow-sm">

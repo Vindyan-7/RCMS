@@ -6,6 +6,8 @@ import { pgTable, uuid, varchar, text, integer, boolean, timestamp } from "drizz
 import { baseColumns } from "./base";
 import { events } from "./events";
 
+import { semesters } from "./semesters";
+
 export const tasks = pgTable("tasks", {
   title: varchar("title", { length: 100 }).notNull(),
   description: text("description"),
@@ -15,6 +17,7 @@ export const tasks = pgTable("tasks", {
   isUnlimited: boolean("is_unlimited").default(false),
   maxMembers: integer("max_members"),
   eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
+  semesterId: uuid("semester_id").references(() => semesters.id, { onDelete: "restrict" }),
   startDate: timestamp("start_date", { withTimezone: true }),
   dueDate: timestamp("due_date", { withTimezone: true }),
   ...baseColumns,

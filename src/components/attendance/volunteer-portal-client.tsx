@@ -13,7 +13,7 @@ import {
   recordAttendanceAction,
   getSessionRecordsAction,
 } from "@/actions/attendance/attendance_records.actions";
-import { searchMembersAction } from "@/actions/members/members.actions";
+import { getEnrolledMembersForActiveSemesterAction } from "@/actions/members/semesters.actions";
 import { AttendanceSessionSelect, VolunteerCodeSelect, MemberSelect, AttendanceRecordSelect } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -101,7 +101,7 @@ export function VolunteerPortalClient() {
       setIsSearchingMembers(true);
       const [recsRes, membersRes] = await Promise.all([
         getSessionRecordsAction(authSession.session.id),
-        searchMembersAction({ search: "", page: 1, limit: 1000 }),
+        getEnrolledMembersForActiveSemesterAction(),
       ]);
 
       if (recsRes.success && recsRes.data) {
@@ -112,9 +112,9 @@ export function VolunteerPortalClient() {
       }
 
       if (membersRes.success && membersRes.data) {
-        setAllMembers(membersRes.data.items);
-        setTotalMembersCount(membersRes.data.total || membersRes.data.items.length);
-        setFilteredMembers(membersRes.data.items);
+        setAllMembers(membersRes.data);
+        setTotalMembersCount(membersRes.data.length);
+        setFilteredMembers(membersRes.data);
       }
       setIsSearchingMembers(false);
     };

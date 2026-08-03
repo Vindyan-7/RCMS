@@ -70,6 +70,9 @@ export async function validateVolunteerCodeAction(
   }
 }
 
+import { SemesterContextService } from "@/services/academic/semester-context.service";
+import { MembershipsRepository } from "@/repositories/members/memberships.repository";
+
 export async function loginVolunteerPortalAction(
   input: string | { memberInput?: string; pinCode?: string }
 ): Promise<ApiResponse<any>> {
@@ -82,20 +85,23 @@ export async function loginVolunteerPortalAction(
       throw new Error("Please enter your Club Membership ID, Roll Number, or Member ID.");
     }
 
-    // Fetch active members to match case-insensitively across all member identifier fields
-    const { data: membersList, error } = await db
-      .from("members")
-      .select("*")
-      .is("deleted_at", null);
+    // Enforce Active Semester Operational Boundary
+    const contextService = new SemesterContextService();
+    const activeSemester = await contextService.getActiveSemester();
 
-    if (error || !membersList) {
-      throw new Error("Failed to query Robotics Club members directory.");
+    if (!activeSemester) {
+      throw new Error("Access Denied: No Active Semester found. Volunteer Portal requires an Active Semester.");
     }
 
-    const memberData = membersList.find((m: any) => {
-      const roll = (m.roll_number || "").toLowerCase();
-      const clubId = (m.club_membership_id || "").toLowerCase();
-      const memId = (m.member_id || "").toLowerCase();
+    // Fetch ONLY members enrolled in the active semester
+    const membershipsRepo = new MembershipsRepository();
+    const enrolledProfiles = await membershipsRepo.findEnrolledMembersWithProfiles(activeSemester.id);
+    const enrolledMembersList = enrolledProfiles.map((p) => p.member);
+
+    const memberData = enrolledMembersList.find((m: any) => {
+      const roll = (m.rollNumber || "").toLowerCase();
+      const clubId = (m.clubMembershipId || "").toLowerCase();
+      const memId = (m.memberId || "").toLowerCase();
       const email = (m.email || "").toLowerCase();
       const uuid = (m.id || "").toLowerCase();
 
@@ -103,7 +109,7 @@ export async function loginVolunteerPortalAction(
     });
 
     if (!memberData) {
-      throw new Error(`Access Denied: Identifier '${rawMemberInput}' not found in Robotics Club directory. Please check your Roll Number or Club Membership ID.`);
+      throw new Error(`Access Denied: Member '${rawMemberInput}' is not enrolled in Active Semester "${activeSemester.name}". Only enrolled members can access the Volunteer Portal.`);
     }
 
     const volunteerMember = memberData;

@@ -12,6 +12,9 @@ import { PaginatedResult } from "@/core/repository/repository.types";
 import { ConflictError, NotFoundError, BadRequestError } from "@/core/errors";
 import { logger } from "@/core/logger";
 
+import { MembershipsRepository } from "@/repositories/members/memberships.repository";
+import { SemesterContextService } from "@/services/academic/semester-context.service";
+
 export class EventsService extends BaseService<
   EventSelect,
   EventInsert,
@@ -20,7 +23,9 @@ export class EventsService extends BaseService<
   constructor(
     private readonly eventsRepo: EventsRepository,
     private readonly participationsRepo: EventParticipationsRepository,
-    private readonly membersRepo?: MembersRepository
+    private readonly membersRepo?: MembersRepository,
+    private readonly membershipsRepo: MembershipsRepository = new MembershipsRepository(),
+    private readonly semesterContextService: SemesterContextService = new SemesterContextService()
   ) {
     super(eventsRepo, undefined, "EventsService");
   }
@@ -30,7 +35,12 @@ export class EventsService extends BaseService<
     actorId: UUID
   ): Promise<EventSelect> {
     logger.info("[EventsService] Creating event", { name: data.name, actorId });
-    return this.eventsRepo.create(data, actorId);
+    const activeSemester = await this.semesterContextService.ensureActiveSemester("Event creation");
+    const payload = {
+      ...data,
+      semesterId: activeSemester.id,
+    };
+    return this.eventsRepo.create(payload, actorId);
   }
 
   public async updateEvent(

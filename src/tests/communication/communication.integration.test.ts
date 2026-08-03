@@ -98,7 +98,7 @@ export async function runCommunicationDomainIntegrationTests() {
 
     // Fetch recipient notifications
     const getListRes = await getMemberNotificationsAction(m1Id);
-    assert(getListRes.success === true && getListRes.data?.items.length >= 2, "ServerAction: getMemberNotificationsAction returns member notification list");
+    assert(getListRes.success === true && (getListRes.data?.items?.length || 0) >= 2, "ServerAction: getMemberNotificationsAction returns member notification list");
 
     // Create Notification Template
     const templateRes = await createNotificationTemplateAction({

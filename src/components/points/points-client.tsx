@@ -11,7 +11,7 @@
  *   5. Deselecting the chip removes the action column entirely
  */
 
-import { useState, useTransition, useCallback } from "react";
+import { useState, useTransition, useCallback, useEffect } from "react";
 import {
   awardPointsAction,
   deductPointsAction,
@@ -24,8 +24,13 @@ import {
   revokeTaskCompletionAction,
   getTaskMemberCompletionsAction,
 } from "@/actions/operations";
+import {
+  getSemesterContextMetadataAction,
+  getEnrolledMembersForActiveSemesterAction,
+} from "@/actions/members/semesters.actions";
+import { SemesterContextMetadata } from "@/services/academic/semester-context.service";
 import { LeaderboardItem } from "@/repositories/points";
-import { TaskSelect, TaskCompletionSelect } from "@/db/schema";
+import { TaskSelect, TaskCompletionSelect, MemberSelect } from "@/db/schema";
 import { Button } from "@/components/ui/button";
 import {
   Trophy,
@@ -39,7 +44,10 @@ import {
   Zap,
   CheckCircle2,
   Check,
+  AlertTriangle,
 } from "lucide-react";
+
+import Link from "next/link";
 
 interface PointsClientProps {
   initialLeaderboard: LeaderboardItem[];
@@ -52,6 +60,21 @@ export function PointsClient({ initialLeaderboard, initialTasks = [] }: PointsCl
   const [branchFilter, setBranchFilter] = useState("all");
   const [activeTab, setActiveTab] = useState<"leaderboard" | "rules" | "tiers">("leaderboard");
   const [isPending, startTransition] = useTransition();
+
+  const [semesterContext, setSemesterContext] = useState<SemesterContextMetadata | null>(null);
+  const [enrolledMembers, setEnrolledMembers] = useState<MemberSelect[]>([]);
+
+  useEffect(() => {
+    async function loadContext() {
+      const [metaRes, membersRes] = await Promise.all([
+        getSemesterContextMetadataAction(),
+        getEnrolledMembersForActiveSemesterAction(),
+      ]);
+      if (metaRes.success && metaRes.data) setSemesterContext(metaRes.data);
+      if (membersRes.success && membersRes.data) setEnrolledMembers(membersRes.data);
+    }
+    loadContext();
+  }, []);
 
   // ── Task Selection ──────────────────────────────────────────────
   const activeTasks = initialTasks.filter((t) => t.status === "active");
@@ -94,11 +117,22 @@ export function PointsClient({ initialLeaderboard, initialTasks = [] }: PointsCl
   );
 
   // ── Helpers ──────────────────────────────────────────────────────
-  const refreshLeaderboard = () =>
+  const refreshLeaderboard = useCallback(() => {
     startTransition(async () => {
-      const res = await getLeaderboardAction();
-      if (res.success && res.data) setLeaderboard(res.data.items);
+      const [leadRes, metaRes, membersRes] = await Promise.all([
+        getLeaderboardAction(),
+        getSemesterContextMetadataAction(),
+        getEnrolledMembersForActiveSemesterAction(),
+      ]);
+      if (leadRes.success && leadRes.data) setLeaderboard(leadRes.data.items);
+      if (metaRes.success && metaRes.data) setSemesterContext(metaRes.data);
+      if (membersRes.success && membersRes.data) setEnrolledMembers(membersRes.data);
     });
+  }, []);
+
+  useEffect(() => {
+    refreshLeaderboard();
+  }, [refreshLeaderboard]);
 
   const loadCompletionsForTask = useCallback(async (taskId: string) => {
     const res = await getTaskMemberCompletionsAction(taskId);
@@ -272,6 +306,52 @@ export function PointsClient({ initialLeaderboard, initialTasks = [] }: PointsCl
     return               { name: "Bronze Rookie",        color: "bg-zinc-800   text-zinc-300   border border-zinc-700" };
   };
 
+  // ── Phase 1 Guard: No Active Semester ──────────────────────────────────────
+  if (semesterContext && !semesterContext.isOperationAllowed) {
+    return (
+      <div className="rounded-2xl border border-amber-800/40 bg-amber-950/20 p-8 text-amber-300 space-y-4 max-w-xl mx-auto my-12 text-center shadow-lg">
+        <div className="flex justify-center">
+          <AlertTriangle className="h-12 w-12 text-amber-400" />
+        </div>
+        <h2 className="text-xl font-bold text-amber-200">No Active Semester</h2>
+        <p className="text-sm text-muted-foreground">
+          Points Engine is unavailable until a semester is activated.
+        </p>
+        <div className="pt-2">
+          <Link href="/dashboard/semesters">
+            <Button variant="outline" className="text-xs border-amber-700/60 text-amber-300 hover:bg-amber-900/40">
+              Go to Semester Management
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Phase 2 Guard: Active Semester exists but 0 Members Enrolled ───────────
+  if (semesterContext && semesterContext.isOperationAllowed && enrolledMembers.length === 0) {
+    return (
+      <div className="rounded-2xl border border-amber-800/40 bg-amber-950/20 p-8 text-amber-300 space-y-4 max-w-xl mx-auto my-12 text-center shadow-lg">
+        <div className="flex justify-center">
+          <AlertTriangle className="h-12 w-12 text-amber-400" />
+        </div>
+        <h2 className="text-xl font-bold text-amber-200">
+          Active Semester: {semesterContext.activeSemester?.name}
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          No members enrolled in this semester.
+        </p>
+        <div className="pt-2">
+          <Link href="/dashboard/semesters">
+            <Button variant="outline" className="text-xs border-amber-700/60 text-amber-300 hover:bg-amber-900/40">
+              Go to Semester Management → Member Enrollment
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
 
@@ -308,6 +388,8 @@ export function PointsClient({ initialLeaderboard, initialTasks = [] }: PointsCl
           </Button>
         </div>
       </div>
+
+
 
       {/* ── Active Tasks Chip Strip ──────────────────────────────── */}
       {activeTab === "leaderboard" && (
@@ -379,6 +461,38 @@ export function PointsClient({ initialLeaderboard, initialTasks = [] }: PointsCl
       {/* ── LEADERBOARD VIEW ─────────────────────────────────────── */}
       {activeTab === "leaderboard" && (
         <div className="space-y-3">
+          {/* Phase 4 Active Semester Statistics Bar */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="rounded-xl border border-border/60 bg-card p-3 shadow-sm space-y-1">
+              <div className="text-[11px] font-semibold text-muted-foreground">Active Semester</div>
+              <div className="text-sm font-bold text-foreground truncate">{semesterContext?.activeSemester?.name || "Active"}</div>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-card p-3 shadow-sm space-y-1">
+              <div className="text-[11px] font-semibold text-muted-foreground">Enrolled Members</div>
+              <div className="text-base font-bold text-blue-400">{enrolledMembers.length} Members</div>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-card p-3 shadow-sm space-y-1">
+              <div className="text-[11px] font-semibold text-muted-foreground">Total Points Awarded</div>
+              <div className="text-base font-bold text-emerald-400">
+                {leaderboard.reduce((sum, item) => sum + (item.totalPoints || 0), 0)} Pts
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-card p-3 shadow-sm space-y-1">
+              <div className="text-[11px] font-semibold text-muted-foreground">Average / Member</div>
+              <div className="text-base font-bold text-amber-400">
+                {enrolledMembers.length === 0 ? 0 : Math.round(leaderboard.reduce((sum, item) => sum + (item.totalPoints || 0), 0) / enrolledMembers.length)} Pts
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-card p-3 shadow-sm space-y-1">
+              <div className="text-[11px] font-semibold text-muted-foreground">Top Performer</div>
+              <div className="text-sm font-bold text-purple-400 truncate">{leaderboard[0]?.memberName || "N/A"}</div>
+            </div>
+          </div>
+
           {/* Toolbar */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full max-w-xs">

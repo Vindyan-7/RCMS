@@ -5,7 +5,7 @@
  */
 
 import { ApiResponse, PaginationQuery } from "@/core/types";
-import { SemesterSelect } from "@/db/schema";
+import { SemesterSelect, MemberSelect } from "@/db/schema";
 import { SemestersRepository } from "@/repositories/members/semesters.repository";
 import { MembershipsRepository } from "@/repositories/members/memberships.repository";
 import { SemestersService } from "@/services/members/semesters.service";
@@ -14,9 +14,14 @@ import { logger } from "@/core/logger";
 import { Authorizer, PERMISSIONS } from "@/core/security/rbac";
 import { PaginatedResult } from "@/core/repository/repository.types";
 
+import { MembersRepository } from "@/repositories/members/members.repository";
+import { SemesterDashboardService, SemesterDashboardData } from "@/services/members/semester-dashboard.service";
+
 const semestersRepo = new SemestersRepository();
 const membershipsRepo = new MembershipsRepository();
+const membersRepo = new MembersRepository();
 const semestersService = new SemestersService(semestersRepo, membershipsRepo);
+const semesterDashboardService = new SemesterDashboardService(semestersRepo, membersRepo, membershipsRepo);
 
 async function getActorContext() {
   return {
@@ -168,3 +173,45 @@ export async function deleteSemesterAction(
     return formatErrorResponse(error);
   }
 }
+
+import { SemesterContextService, SemesterContextMetadata } from "@/services/academic/semester-context.service";
+
+export async function getSemesterDashboardDataAction(): Promise<ApiResponse<SemesterDashboardData>> {
+  logger.debug("[Action: getSemesterDashboardDataAction] Initiating consolidated dashboard fetch");
+  try {
+    const actor = await getActorContext();
+    Authorizer.hasPermission(actor, PERMISSIONS.MEMBERS_VIEW);
+    const data = await semesterDashboardService.getDashboardData();
+    return { success: true, data };
+  } catch (error) {
+    logger.error("[Action: getSemesterDashboardDataAction] Failed", error);
+    return formatErrorResponse(error);
+  }
+}
+
+export async function getSemesterContextMetadataAction(): Promise<ApiResponse<SemesterContextMetadata>> {
+  logger.debug("[Action: getSemesterContextMetadataAction] Initiating");
+  try {
+    const contextService = new SemesterContextService();
+    const metadata = await contextService.getSemesterMetadata();
+    return { success: true, data: metadata };
+  } catch (error) {
+    logger.error("[Action: getSemesterContextMetadataAction] Failed", error);
+    return formatErrorResponse(error);
+  }
+}
+
+export async function getEnrolledMembersForActiveSemesterAction(): Promise<ApiResponse<MemberSelect[]>> {
+  logger.debug("[Action: getEnrolledMembersForActiveSemesterAction] Initiating");
+  try {
+    const actor = await getActorContext();
+    Authorizer.hasPermission(actor, PERMISSIONS.MEMBERS_VIEW);
+    const contextService = new SemesterContextService();
+    const enrolledMembers = await contextService.getEnrolledMembers();
+    return { success: true, data: enrolledMembers };
+  } catch (error) {
+    logger.error("[Action: getEnrolledMembersForActiveSemesterAction] Failed", error);
+    return formatErrorResponse(error);
+  }
+}
+

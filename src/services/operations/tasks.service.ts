@@ -12,6 +12,9 @@ import { PaginatedResult } from "@/core/repository/repository.types";
 import { ConflictError, NotFoundError, BadRequestError } from "@/core/errors";
 import { logger } from "@/core/logger";
 
+import { MembershipsRepository } from "@/repositories/members/memberships.repository";
+import { SemesterContextService } from "@/services/academic/semester-context.service";
+
 export class TasksService extends BaseService<
   TaskSelect,
   TaskInsert,
@@ -20,7 +23,9 @@ export class TasksService extends BaseService<
   constructor(
     private readonly tasksRepo: TasksRepository,
     private readonly completionsRepo: TaskCompletionsRepository,
-    private readonly membersRepo?: MembersRepository
+    private readonly membersRepo?: MembersRepository,
+    private readonly membershipsRepo: MembershipsRepository = new MembershipsRepository(),
+    private readonly semesterContextService: SemesterContextService = new SemesterContextService()
   ) {
     super(tasksRepo, undefined, "TasksService");
   }
@@ -30,7 +35,12 @@ export class TasksService extends BaseService<
     actorId: UUID
   ): Promise<TaskSelect> {
     logger.info("[TasksService] Creating task", { title: data.title, actorId });
-    return this.tasksRepo.create(data, actorId);
+    const activeSemester = await this.semesterContextService.ensureActiveSemester("Task creation");
+    const payload = {
+      ...data,
+      semesterId: activeSemester.id,
+    };
+    return this.tasksRepo.create(payload, actorId);
   }
 
   public async updateTask(
@@ -53,6 +63,17 @@ export class TasksService extends BaseService<
     const task = await this.getById(taskId);
     if (task.status !== "active") {
       throw new BadRequestError(`Task ${taskId} is currently ${task.status}. Only active tasks can be completed`);
+    }
+
+    const activeSemester = await this.semesterContextService.getActiveSemester();
+    if (activeSemester) {
+      const activeMem = await this.membershipsRepo.findActiveMembership(memberId);
+      if (!activeMem || activeMem.semesterId !== activeSemester.id || activeMem.status !== "active") {
+        throw new ConflictError(
+          "Member is not renewed for the active semester. Only active semester members can complete tasks.",
+          "MEMBER_NOT_RENEWED"
+        );
+      }
     }
 
     if (this.membersRepo) {

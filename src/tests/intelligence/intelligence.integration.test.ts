@@ -42,7 +42,7 @@ export async function runIntelligenceDomainIntegrationTests() {
 
   // 3. Universal Search Engine Action
   const searchRes = await universalSearchAction({ query: "Intelligence" });
-  assert(searchRes.success === true && searchRes.data?.length > 0, "ServerAction: universalSearchAction performs cross-domain fuzzy search");
+  assert(searchRes.success === true && (searchRes.data?.length || 0) > 0, "ServerAction: universalSearchAction performs cross-domain fuzzy search");
 
   // 4. Automated Insights Engine Action
   const insightsRes = await getSystemInsightsAction();

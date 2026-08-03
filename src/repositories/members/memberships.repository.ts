@@ -2,9 +2,9 @@
  * Members Domain - Memberships Repository Implementation
  */
 
-import { eq, and, isNull, sql } from "drizzle-orm";
+import { eq, and, isNull, sql, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { memberships, MembershipSelect, MembershipInsert } from "@/db/schema";
+import { memberships, members, MembershipSelect, MembershipInsert, MemberSelect } from "@/db/schema";
 import { BaseRepository } from "@/core/repository/base-repository";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
 import { UUID, PaginationQuery } from "@/core/types";
@@ -16,6 +16,31 @@ export class MembershipsRepository extends BaseRepository<
 > {
   protected getTableName(): string {
     return "memberships";
+  }
+
+  /**
+   * Fetch all active memberships joined with full member directory profiles for a given semester.
+   */
+  public async findEnrolledMembersWithProfiles(
+    semesterId: UUID
+  ): Promise<Array<{ membership: MembershipSelect; member: MemberSelect }>> {
+    const rows = await db
+      .select({
+        membership: memberships,
+        member: members,
+      })
+      .from(memberships)
+      .innerJoin(members, eq(memberships.memberId, members.id))
+      .where(
+        and(
+          eq(memberships.semesterId, semesterId),
+          eq(memberships.status, "active"),
+          isNull(memberships.deletedAt),
+          isNull(members.deletedAt)
+        )
+      );
+
+    return rows;
   }
 
   public async findById(
@@ -55,6 +80,32 @@ export class MembershipsRepository extends BaseRepository<
       .limit(1);
 
     return result[0] || null;
+  }
+
+  /**
+   * Batch: fetch the active membership for every member in the list.
+   * Single SQL query (IN clause) — eliminates N+1 on the semesters page.
+   */
+  public async findAllActiveMemberships(
+    memberIds: UUID[]
+  ): Promise<Record<string, MembershipSelect>> {
+    if (memberIds.length === 0) return {};
+
+    const rows = await db
+      .select()
+      .from(memberships)
+      .where(
+        and(
+          inArray(memberships.memberId, memberIds),
+          eq(memberships.status, "active"),
+          isNull(memberships.deletedAt)
+        )
+      );
+
+    return rows.reduce((acc: Record<string, MembershipSelect>, row: MembershipSelect) => {
+      acc[row.memberId] = row;
+      return acc;
+    }, {});
   }
 
   public async getMembershipHistory(

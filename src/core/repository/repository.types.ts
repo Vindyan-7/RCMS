@@ -9,6 +9,7 @@ export interface QueryOptions {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   includeDeleted?: boolean;
+  includeCount?: boolean;
 }
 
 export interface PaginatedResult<T> {

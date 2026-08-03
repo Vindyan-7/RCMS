@@ -13,7 +13,7 @@ import { MemberValidator } from "@/validation/members";
 import { formatErrorResponse } from "@/core/errors";
 import { logger } from "@/core/logger";
 import { Authorizer, PERMISSIONS } from "@/core/security/rbac";
-import { PaginatedResult } from "@/core/repository/repository.types";
+import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
 
 // Singleton instances for Server Actions environment
 const membersRepo = new MembersRepository();
@@ -145,7 +145,8 @@ export async function getMemberAction(
 
 export async function searchMembersAction(
   query?: string | PaginationQuery,
-  pagination?: PaginationQuery
+  pagination?: PaginationQuery,
+  options?: QueryOptions
 ): Promise<ApiResponse<PaginatedResult<MemberSelect>>> {
   logger.debug("[Action: searchMembersAction] Initiating action execution");
   try {
@@ -160,7 +161,7 @@ export async function searchMembersAction(
       pag = query as PaginationQuery;
     }
 
-    const results = await membersService.searchMembers(q, pag);
+    const results = await membersService.searchMembers(q, pag, options);
 
     return {
       success: true,
@@ -195,16 +196,29 @@ export async function importMembersCsvAction(
 
       const record: Record<string, string> = {};
       header.forEach((h, idx) => {
-        record[h] = cols[idx] || "";
+        record[h] = (cols[idx] || "").trim();
       });
 
-      const name = record["name"] || cols[0];
-      const rollNumber = record["roll number"] || record["rollnumber"] || record["roll_number"] || cols[1];
-      const email = record["email"] || cols[2];
-      const phone = record["phone"] || cols[3] || "0000000000";
-      const branch = record["branch"] || cols[4] || "ECE";
-      const year = Number(record["year"] || cols[5]) || 1;
-      const gender = record["gender"] || "Other";
+      const name = record["name"] || cols[0] || "";
+      const rollNumber = record["roll number"] || record["rollnumber"] || record["roll_number"] || cols[1] || "";
+      const email = record["email"] || cols[2] || "";
+      
+      // Normalize phone: extract trailing 10 digits or fallback to valid default
+      const rawPhone = record["phone"] || cols[3] || "";
+      const digits = rawPhone.replace(/\D/g, "").slice(-10);
+      const phone = digits.length === 10 && /^[6-9]/.test(digits) ? digits : "9000000000";
+
+      const branch = (record["branch"] || cols[4] || "ECE").toUpperCase();
+      const year = Math.min(4, Math.max(1, Number(record["year"] || cols[5]) || 1));
+      
+      // Normalize gender to lowercase enum expected by Zod schema
+      const rawGender = (record["gender"] || cols[6] || "other").toLowerCase();
+      const gender = ["male", "female", "other", "prefer_not_to_say"].includes(rawGender) ? rawGender : "other";
+
+      if (!name || !rollNumber || !email) {
+        errors.push(`Line ${i + 1}: Missing required fields (name, roll number, or email)`);
+        continue;
+      }
 
       try {
         const res = await membersService.registerMember({
@@ -218,7 +232,7 @@ export async function importMembersCsvAction(
         }, actor.id);
         imported.push(res);
       } catch (err: any) {
-        errors.push(`Line ${i + 1}: ${err.message}`);
+        errors.push(`Line ${i + 1} (${name} - ${rollNumber}): ${err.message}`);
       }
     }
 

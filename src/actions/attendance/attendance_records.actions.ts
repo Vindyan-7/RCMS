@@ -172,3 +172,24 @@ export async function exportAttendanceRecordsCsvAction(sessionId?: string): Prom
     return formatErrorResponse(error);
   }
 }
+
+export async function bulkRecordAttendanceAction(
+  sessionId: string,
+  memberIds: string[]
+): Promise<ApiResponse<{ recordedCount: number }>> {
+  logger.info("[Action: bulkRecordAttendanceAction] Bulk recording attendance", { sessionId, count: memberIds.length });
+  try {
+    const actor = await getActorContext();
+    Authorizer.hasPermission(actor, PERMISSIONS.ATTENDANCE_MARK);
+
+    const res = await recordsService.bulkRecordAttendance(sessionId, memberIds, actor.id);
+
+    return {
+      success: true,
+      data: res,
+    };
+  } catch (error) {
+    logger.error("[Action: bulkRecordAttendanceAction] Execution failed", error);
+    return formatErrorResponse(error);
+  }
+}

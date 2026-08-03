@@ -31,7 +31,7 @@ export const FILE_UPLOAD_CONSTANTS = {
 
 export const REGEX_PATTERNS = {
   // Matches e.g., SAC-RC-26001
-  MEMBER_ID: /^SAC-RC-\d{2}\d{3}$/,
+  MEMBER_ID: /^SAC-RC-\d{2}\d{3,}$/,
   // Standard Indian roll number patterns (alpha-numeric)
   ROLL_NUMBER: /^[A-Za-z0-9\-\/]{5,20}$/,
   // 10-digit Indian phone number
