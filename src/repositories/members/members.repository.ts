@@ -3,11 +3,12 @@
  */
 
 import { eq, or, ilike, and, isNull, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { db, supabase, toCamelCase } from "@/db";
 import { members, MemberSelect, MemberInsert } from "@/db/schema";
 import { BaseRepository } from "@/core/repository/base-repository";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
 import { UUID, PaginationQuery } from "@/core/types";
+import { logger } from "@/core/logger";
 
 export class MembersRepository extends BaseRepository<
   MemberSelect,
@@ -119,20 +120,40 @@ export class MembersRepository extends BaseRepository<
 
     const includeCount = options?.includeCount ?? true;
 
-    const items = await db
-      .select()
-      .from(members)
-      .where(whereClause)
-      .limit(limit)
-      .offset(offset);
+    let items: MemberSelect[] = [];
+    try {
+      items = await db
+        .select()
+        .from(members)
+        .where(whereClause)
+        .limit(limit)
+        .offset(offset);
+    } catch (err) {
+      logger.error("[MembersRepository] Drizzle query error", err);
+    }
+
+    if (items.length === 0 && !query.search) {
+      try {
+        const { data } = await supabase.from("members").select("*").is("deleted_at", null);
+        if (data && data.length > 0) {
+          items = toCamelCase<MemberSelect[]>(data);
+        }
+      } catch (err) {
+        logger.error("[MembersRepository] REST fallback error", err);
+      }
+    }
 
     let total = items.length;
     if (includeCount) {
-      const totalRes = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(members)
-        .where(whereClause);
-      total = Number(totalRes[0]?.count || 0);
+      try {
+        const totalRes = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(members)
+          .where(whereClause);
+        if (totalRes[0]?.count) total = Number(totalRes[0].count);
+      } catch {
+        total = items.length;
+      }
     }
 
     return {
