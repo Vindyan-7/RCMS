@@ -3,7 +3,7 @@
  */
 
 import { eq, and, isNull, sql } from "drizzle-orm";
-import { db, supabase, toCamelCase, toSnakeCase } from "@/db";
+import { db, supabase, toCamelCase, toSnakeCase, isServerless } from "@/db";
 import { events, EventSelect, EventInsert } from "@/db/schema";
 import { BaseRepository } from "@/core/repository/base-repository";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
@@ -23,6 +23,14 @@ export class EventsRepository extends BaseRepository<
     id: UUID,
     options?: { includeDeleted?: boolean }
   ): Promise<EventSelect | null> {
+    if (isServerless) {
+      try {
+        const { data } = await supabase.from("events").select("*").eq("id", id).limit(1);
+        if (data && data[0]) return toCamelCase<EventSelect>(data[0]);
+      } catch {}
+      return null;
+    }
+
     const conditions = [eq(events.id, id)];
     if (!options?.includeDeleted) {
       conditions.push(isNull(events.deletedAt));
@@ -56,32 +64,42 @@ export class EventsRepository extends BaseRepository<
     const limit = query.limit || 1000;
     const offset = (page - 1) * limit;
 
-    const conditions = [];
-    if (!options?.includeDeleted) {
-      conditions.push(isNull(events.deletedAt));
-    }
-
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
     let items: EventSelect[] = [];
-    try {
-      items = await db
-        .select()
-        .from(events)
-        .where(whereClause)
-        .limit(limit)
-        .offset(offset);
-    } catch (err) {
-      logger.error("[EventsRepository] Drizzle findAll error", err);
-    }
-
-    if (items.length === 0) {
+    if (isServerless) {
       try {
         const { data } = await supabase.from("events").select("*").is("deleted_at", null);
         if (data && data.length > 0) {
           items = toCamelCase<EventSelect[]>(data);
         }
-      } catch {}
+      } catch (err) {
+        logger.error("[EventsRepository] REST query error", err);
+      }
+    } else {
+      const conditions = [];
+      if (!options?.includeDeleted) {
+        conditions.push(isNull(events.deletedAt));
+      }
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      try {
+        items = await db
+          .select()
+          .from(events)
+          .where(whereClause)
+          .limit(limit)
+          .offset(offset);
+      } catch (err) {
+        logger.error("[EventsRepository] Drizzle findAll error", err);
+      }
+
+      if (items.length === 0) {
+        try {
+          const { data } = await supabase.from("events").select("*").is("deleted_at", null);
+          if (data && data.length > 0) {
+            items = toCamelCase<EventSelect[]>(data);
+          }
+        } catch {}
+      }
     }
 
     return {

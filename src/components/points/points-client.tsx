@@ -56,6 +56,7 @@ interface PointsClientProps {
 
 export function PointsClient({ initialLeaderboard, initialTasks = [] }: PointsClientProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>(initialLeaderboard);
+  const [tasksList, setTasksList] = useState<TaskSelect[]>(initialTasks);
   const [searchQuery, setSearchQuery] = useState("");
   const [branchFilter, setBranchFilter] = useState("all");
   const [activeTab, setActiveTab] = useState<"leaderboard" | "rules" | "tiers">("leaderboard");
@@ -66,18 +67,21 @@ export function PointsClient({ initialLeaderboard, initialTasks = [] }: PointsCl
 
   useEffect(() => {
     async function loadContext() {
-      const [metaRes, membersRes] = await Promise.all([
+      const { getTasksAction } = await import("@/actions/operations");
+      const [metaRes, membersRes, tasksRes] = await Promise.all([
         getSemesterContextMetadataAction(),
         getEnrolledMembersForActiveSemesterAction(),
+        getTasksAction({ limit: 100 }),
       ]);
       if (metaRes.success && metaRes.data) setSemesterContext(metaRes.data);
       if (membersRes.success && membersRes.data) setEnrolledMembers(membersRes.data);
+      if (tasksRes.success && tasksRes.data) setTasksList(tasksRes.data.items);
     }
     loadContext();
   }, []);
 
   // ── Task Selection ──────────────────────────────────────────────
-  const activeTasks = initialTasks.filter((t) => t.status === "active");
+  const activeTasks = tasksList.filter((t) => t.status === "active");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   // Map: memberId → TaskCompletionSelect (for the selected task)
@@ -118,16 +122,21 @@ export function PointsClient({ initialLeaderboard, initialTasks = [] }: PointsCl
 
   // ── Helpers ──────────────────────────────────────────────────────
   const refreshLeaderboard = useCallback(() => {
-    startTransition(async () => {
-      const [leadRes, metaRes, membersRes] = await Promise.all([
-        getLeaderboardAction(),
-        getSemesterContextMetadataAction(),
-        getEnrolledMembersForActiveSemesterAction(),
-      ]);
-      if (leadRes.success && leadRes.data) setLeaderboard(leadRes.data.items);
-      if (metaRes.success && metaRes.data) setSemesterContext(metaRes.data);
-      if (membersRes.success && membersRes.data) setEnrolledMembers(membersRes.data);
-    });
+    (async () => {
+      try {
+        const { getTasksAction } = await import("@/actions/operations");
+        const [leadRes, metaRes, membersRes, tasksRes] = await Promise.all([
+          getLeaderboardAction(),
+          getSemesterContextMetadataAction(),
+          getEnrolledMembersForActiveSemesterAction(),
+          getTasksAction({ limit: 100 }),
+        ]);
+        if (leadRes.success && leadRes.data) setLeaderboard(leadRes.data.items);
+        if (metaRes.success && metaRes.data) setSemesterContext(metaRes.data);
+        if (membersRes.success && membersRes.data) setEnrolledMembers(membersRes.data);
+        if (tasksRes.success && tasksRes.data) setTasksList(tasksRes.data.items);
+      } catch {}
+    })();
   }, []);
 
   useEffect(() => {

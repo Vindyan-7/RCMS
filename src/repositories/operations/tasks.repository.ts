@@ -3,7 +3,7 @@
  */
 
 import { eq, and, isNull, sql } from "drizzle-orm";
-import { db, supabase, toCamelCase, toSnakeCase } from "@/db";
+import { db, supabase, toCamelCase, toSnakeCase, isServerless } from "@/db";
 import { tasks, TaskSelect, TaskInsert } from "@/db/schema";
 import { BaseRepository } from "@/core/repository/base-repository";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
@@ -23,6 +23,14 @@ export class TasksRepository extends BaseRepository<
     id: UUID,
     options?: { includeDeleted?: boolean }
   ): Promise<TaskSelect | null> {
+    if (isServerless) {
+      try {
+        const { data } = await supabase.from("tasks").select("*").eq("id", id).limit(1);
+        if (data && data[0]) return toCamelCase<TaskSelect>(data[0]);
+      } catch {}
+      return null;
+    }
+
     const conditions = [eq(tasks.id, id)];
     if (!options?.includeDeleted) {
       conditions.push(isNull(tasks.deletedAt));
@@ -56,32 +64,42 @@ export class TasksRepository extends BaseRepository<
     const limit = query.limit || 1000;
     const offset = (page - 1) * limit;
 
-    const conditions = [];
-    if (!options?.includeDeleted) {
-      conditions.push(isNull(tasks.deletedAt));
-    }
-
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
     let items: TaskSelect[] = [];
-    try {
-      items = await db
-        .select()
-        .from(tasks)
-        .where(whereClause)
-        .limit(limit)
-        .offset(offset);
-    } catch (err) {
-      logger.error("[TasksRepository] Drizzle findAll error", err);
-    }
-
-    if (items.length === 0) {
+    if (isServerless) {
       try {
         const { data } = await supabase.from("tasks").select("*").is("deleted_at", null);
         if (data && data.length > 0) {
           items = toCamelCase<TaskSelect[]>(data);
         }
-      } catch {}
+      } catch (err) {
+        logger.error("[TasksRepository] REST query error", err);
+      }
+    } else {
+      const conditions = [];
+      if (!options?.includeDeleted) {
+        conditions.push(isNull(tasks.deletedAt));
+      }
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      try {
+        items = await db
+          .select()
+          .from(tasks)
+          .where(whereClause)
+          .limit(limit)
+          .offset(offset);
+      } catch (err) {
+        logger.error("[TasksRepository] Drizzle findAll error", err);
+      }
+
+      if (items.length === 0) {
+        try {
+          const { data } = await supabase.from("tasks").select("*").is("deleted_at", null);
+          if (data && data.length > 0) {
+            items = toCamelCase<TaskSelect[]>(data);
+          }
+        } catch {}
+      }
     }
 
     return {
