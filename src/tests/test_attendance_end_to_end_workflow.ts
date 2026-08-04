@@ -144,7 +144,7 @@ async function main() {
     console.error("❌ Failed to export attendance CSV:", csvRes.error);
     process.exit(1);
   }
-  console.log(`✅ Step 9: Exported Attendance CSV successfully! Size: ${csvRes.data.length} bytes`);
+  console.log(`✅ Step 9: Exported Attendance CSV successfully! Size: ${csvRes.data.csvContent.length} bytes`);
 
   console.log("=================================================");
   console.log("🎉 Complete Attendance E2E Workflow Verification PASSED!");

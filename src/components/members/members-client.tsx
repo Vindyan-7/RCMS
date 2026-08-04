@@ -569,7 +569,7 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
                 <th className="px-4 py-3">ROLE</th>
                 <th className="px-4 py-3">PHONE NUMBER</th>
                 <th className="px-4 py-3">EMAIL</th>
-                <th className="px-4 py-3">INTERNAL MEMBER ID</th>
+                <th className="px-4 py-3">SYSTEM MEMBER ID</th>
                 <th className="px-4 py-3">STATUS</th>
                 <th className="px-4 py-3 text-right">ACTIONS</th>
               </tr>

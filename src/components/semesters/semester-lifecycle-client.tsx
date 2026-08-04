@@ -486,7 +486,6 @@ export function SemesterLifecycleClient({ initialSemesters, initialMembers, acad
                             <GraduationCap className="h-3.5 w-3.5 text-primary shrink-0" />
                             {s.name}
                           </div>
-                          <div className="text-[10px] text-muted-foreground font-mono mt-0.5">{s.id.slice(0, 12)}…</div>
                         </td>
                         <td className="px-4 py-3">{statusBadge(s.status)}</td>
                         <td className="px-4 py-3 text-muted-foreground">
@@ -701,7 +700,9 @@ export function SemesterLifecycleClient({ initialSemesters, initialMembers, acad
                                         {membershipStatusBadge(h.status)}
                                         <span className="text-xs text-foreground font-medium">Joined: {fmtDate(h.joinDate)}</span>
                                         {h.exitDate && <span className="text-xs text-muted-foreground">Exited: {fmtDate(h.exitDate)}</span>}
-                                        <span className="font-mono text-[10px] text-muted-foreground/60 ml-auto">Sem: {h.semesterId.slice(0, 8)}…</span>
+                                        <span className="text-xs font-semibold text-primary ml-auto">
+                                          Semester: {semesters.find((s) => s.id === h.semesterId)?.name || "Active Semester"}
+                                        </span>
                                       </div>
                                     ))}
                                   </div>

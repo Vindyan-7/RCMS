@@ -339,14 +339,15 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
     });
   };
 
-  const handleExportCsv = async () => {
+  const handleExportCsv = async (sessionId?: string) => {
     startTransition(async () => {
-      const res = await exportAttendanceRecordsCsvAction();
+      const res = await exportAttendanceRecordsCsvAction(sessionId);
       if (res.success && res.data) {
-        const encodedUri = encodeURI("data:text/csv;charset=utf-8," + res.data);
+        const blob = new Blob([res.data.csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `RCMS_Attendance_Records_${Date.now()}.csv`);
+        link.setAttribute("href", url);
+        link.setAttribute("download", res.data.filename);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -479,6 +480,16 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
             </div>
 
             <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleExportCsv(activeAttendanceSession.id)}
+                disabled={isPending}
+                className="text-xs h-8 flex items-center space-x-1"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>Export Session CSV</span>
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -632,7 +643,7 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleExportCsv}
+                onClick={() => handleExportCsv()}
                 disabled={isPending}
                 className="flex items-center space-x-1.5 text-xs"
               >
@@ -862,35 +873,39 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
             <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
               <thead className="border-b border-border bg-muted/40 font-semibold uppercase tracking-wider text-[11px] text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3">Record ID</th>
-                  <th className="px-4 py-3">Member ID</th>
-                  <th className="px-4 py-3">Points Earned</th>
-                  <th className="px-4 py-3">Late Status</th>
-                  <th className="px-4 py-3">Scan Method</th>
-                  <th className="px-4 py-3">Timestamp</th>
+                  <th className="px-4 py-3">SESSION TITLE</th>
+                  <th className="px-4 py-3">MEMBER NAME</th>
+                  <th className="px-4 py-3">MEMBERSHIP ID</th>
+                  <th className="px-4 py-3">ROLL NUMBER</th>
+                  <th className="px-4 py-3">POINTS EARNED</th>
+                  <th className="px-4 py-3">LATE STATUS</th>
+                  <th className="px-4 py-3">SCAN METHOD</th>
+                  <th className="px-4 py-3">TIMESTAMP</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
                 {records.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                       No attendance records logged yet.
                     </td>
                   </tr>
                 ) : (
-                  records.map((rec) => (
+                  records.map((rec: any) => (
                     <tr key={rec.id} className="hover:bg-accent/40 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{rec.id}</td>
-                      <td className="px-4 py-3 font-mono text-xs">{rec.memberId}</td>
-                      <td className="px-4 py-3 font-bold text-emerald-400">{rec.points} Pts</td>
+                      <td className="px-4 py-3 font-semibold text-foreground">{rec.sessionTitle || "Attendance Session"}</td>
+                      <td className="px-4 py-3 font-medium text-blue-300">{rec.memberName || "Member"}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{rec.membershipId || "—"}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{rec.rollNumber || "—"}</td>
+                      <td className="px-4 py-3 font-bold text-emerald-400">{rec.points || 0} Pts</td>
                       <td className="px-4 py-3">
                         <Badge variant={rec.late ? "destructive" : "success"} className="text-[10px]">
                           {rec.late ? "Late" : "On Time"}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 capitalize text-xs text-muted-foreground">{rec.method}</td>
+                      <td className="px-4 py-3 capitalize text-xs text-muted-foreground">{rec.method || "Manual"}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
-                        {new Date(rec.scanTime).toLocaleString()}
+                        {rec.scanTime ? new Date(rec.scanTime).toLocaleString("en-IN") : "—"}
                       </td>
                     </tr>
                   ))

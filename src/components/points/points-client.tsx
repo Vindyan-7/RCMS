@@ -741,8 +741,8 @@ export function PointsClient({ initialLeaderboard, initialTasks = [] }: PointsCl
             </div>
             <form onSubmit={handleRollback} className="space-y-4 text-xs">
               <div>
-                <label className="font-semibold block mb-1">Transaction ID (UUID)</label>
-                <input type="text" value={txId} onChange={(e) => setTxId(e.target.value)} required placeholder="e.g. 123e4567-..." className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono" />
+                <label className="font-semibold block mb-1">Transaction Reference ID</label>
+                <input type="text" value={txId} onChange={(e) => setTxId(e.target.value)} required placeholder="Enter reference transaction code..." className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs" />
               </div>
               <div>
                 <label className="font-semibold block mb-1">Reason</label>

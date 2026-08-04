@@ -540,7 +540,7 @@ export function OperationsClient({ initialEvents, initialTasks }: OperationsClie
                   <option value="">-- Select Member --</option>
                   {enrolledMembers.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name} ({m.memberId || m.rollNumber || m.id.slice(0, 8)})
+                      {m.name} ({m.clubMembershipId || m.memberId || m.rollNumber || "Member"})
                     </option>
                   ))}
                 </select>
@@ -580,7 +580,7 @@ export function OperationsClient({ initialEvents, initialTasks }: OperationsClie
                   <option value="">-- Select Member --</option>
                   {enrolledMembers.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name} ({m.memberId || m.rollNumber || m.id.slice(0, 8)})
+                      {m.name} ({m.clubMembershipId || m.memberId || m.rollNumber || "Member"})
                     </option>
                   ))}
                 </select>
