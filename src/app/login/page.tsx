@@ -2,25 +2,43 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, ShieldCheck, ArrowRight, Lock } from "lucide-react";
+import { Bot, ShieldCheck, ArrowRight, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@robotics.org");
-  const [password, setPassword] = useState("••••••••");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage(null);
 
-    document.cookie = "rcms_admin_session=authenticated; path=/; max-age=86400; SameSite=Lax";
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    setTimeout(() => {
-      setLoading(false);
+      if (error) {
+        // Handle common auth errors or offer smooth login fallback
+        setErrorMessage(error.message || "Invalid authentication credentials");
+        setLoading(false);
+        return;
+      }
+
+      // Set admin session cookie for SSR middleware
+      document.cookie = "rcms_admin_session=authenticated; path=/; max-age=86400; SameSite=Lax";
       router.push("/dashboard");
-    }, 400);
+    } catch (err: any) {
+      setErrorMessage(err?.message || "An unexpected error occurred during authentication");
+      setLoading(false);
+    }
   };
 
   return (
@@ -34,9 +52,16 @@ export default function LoginPage() {
             RCMS Authentication
           </h2>
           <p className="text-xs text-muted-foreground">
-            Enter your credentials to access the Robotics Club Portal
+            Enter your credentials to access the Robotics Club Management System
           </p>
         </div>
+
+        {errorMessage && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3.5 text-xs text-destructive flex items-center space-x-2">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div className="space-y-1.5">
@@ -45,9 +70,10 @@ export default function LoginPage() {
             </label>
             <input
               type="email"
+              placeholder="admin@robotics.org"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               required
             />
           </div>
@@ -58,16 +84,17 @@ export default function LoginPage() {
             </label>
             <input
               type="password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               required
             />
           </div>
 
           <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-500 flex items-center space-x-2">
             <ShieldCheck className="h-4 w-4 flex-shrink-0" />
-            <span>RBAC Super Admin Access Credentials Configured</span>
+            <span>Production Supabase Auth Session Active</span>
           </div>
 
           <Button type="submit" className="w-full" disabled={loading}>
@@ -75,7 +102,7 @@ export default function LoginPage() {
               "Authenticating..."
             ) : (
               <span className="flex items-center justify-center space-x-2">
-                <span>Sign In to Portal</span>
+                <span>Sign In to Dashboard</span>
                 <ArrowRight className="h-4 w-4" />
               </span>
             )}
@@ -83,7 +110,7 @@ export default function LoginPage() {
         </form>
 
         <div className="text-center text-[11px] text-muted-foreground border-t border-border pt-4">
-          Robotics Club Management System | Release Candidate v1.0
+          Robotics Club Management System | Production Auth v1.0
         </div>
       </div>
     </main>
