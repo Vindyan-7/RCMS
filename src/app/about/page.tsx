@@ -5,6 +5,17 @@ import { Bot, Cpu, Zap, Layers, Award, Target, Compass, Users } from "lucide-rea
 
 export const metadata: Metadata = {
   title: "About",
+  description: "Learn about the Robotics Club technical wings, innovation projects, and hardware engineering teams.",
+  openGraph: {
+    title: "About | Robotics Club",
+    description: "Learn about the Robotics Club technical wings, innovation projects, and hardware engineering teams.",
+    siteName: "Robotics Club",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "About | Robotics Club",
+    description: "Learn about the Robotics Club technical wings, innovation projects, and hardware engineering teams.",
+  },
 };
 
 export default function AboutPage() {

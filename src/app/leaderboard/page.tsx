@@ -9,6 +9,17 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Leaderboard",
+  description: "Official Robotics Club Public Leaderboard and Member Rankings.",
+  openGraph: {
+    title: "Robotics Club Leaderboard",
+    description: "Official Robotics Club Public Leaderboard and Member Rankings.",
+    siteName: "Robotics Club",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Robotics Club Leaderboard",
+    description: "Official Robotics Club Public Leaderboard and Member Rankings.",
+  },
 };
 
 export default async function PublicLeaderboardPage() {
