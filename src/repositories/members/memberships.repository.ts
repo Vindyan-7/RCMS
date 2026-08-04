@@ -100,13 +100,30 @@ export class MembershipsRepository extends BaseRepository<
       conditions.push(isNull(memberships.deletedAt));
     }
 
-    const result = await db
-      .select()
-      .from(memberships)
-      .where(and(...conditions))
-      .limit(1);
+    try {
+      const result = await db
+        .select()
+        .from(memberships)
+        .where(and(...conditions))
+        .limit(1);
 
-    return result[0] || null;
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[MembershipsRepository] Drizzle findActiveMembership error", err);
+    }
+
+    try {
+      const { data } = await supabase
+        .from("memberships")
+        .select("*")
+        .eq("member_id", memberId)
+        .eq("status", "active")
+        .is("deleted_at", null)
+        .limit(1);
+      if (data && data[0]) return toCamelCase<MembershipSelect>(data[0]);
+    } catch {}
+
+    return null;
   }
 
   /**
@@ -118,16 +135,35 @@ export class MembershipsRepository extends BaseRepository<
   ): Promise<Record<string, MembershipSelect>> {
     if (memberIds.length === 0) return {};
 
-    const rows = await db
-      .select()
-      .from(memberships)
-      .where(
-        and(
-          inArray(memberships.memberId, memberIds),
-          eq(memberships.status, "active"),
-          isNull(memberships.deletedAt)
-        )
-      );
+    let rows: MembershipSelect[] = [];
+    try {
+      rows = await db
+        .select()
+        .from(memberships)
+        .where(
+          and(
+            inArray(memberships.memberId, memberIds),
+            eq(memberships.status, "active"),
+            isNull(memberships.deletedAt)
+          )
+        );
+    } catch (err) {
+      logger.error("[MembershipsRepository] Drizzle findAllActiveMemberships error", err);
+    }
+
+    if (rows.length === 0) {
+      try {
+        const { data } = await supabase
+          .from("memberships")
+          .select("*")
+          .in("member_id", memberIds)
+          .eq("status", "active")
+          .is("deleted_at", null);
+        if (data && data.length > 0) {
+          rows = toCamelCase<MembershipSelect[]>(data);
+        }
+      } catch {}
+    }
 
     return rows.reduce((acc: Record<string, MembershipSelect>, row: MembershipSelect) => {
       acc[row.memberId] = row;

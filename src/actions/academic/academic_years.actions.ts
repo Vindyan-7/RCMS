@@ -6,7 +6,7 @@
 
 import { ApiResponse } from "@/core/types";
 import { AcademicYearSelect } from "@/db/schema";
-import { db } from "@/db";
+import { db, supabase, toCamelCase } from "@/db";
 import { academicYears } from "@/db/schema";
 import { isNull, desc } from "drizzle-orm";
 import { formatErrorResponse } from "@/core/errors";
@@ -15,28 +15,36 @@ import { logger } from "@/core/logger";
 async function ensureDefaultAcademicYears(): Promise<void> {
   const currentYear = new Date().getFullYear();
   const month = new Date().getMonth();
-  // If current month is before June (month 5), current academic year started last year
   const baseYear = month < 5 ? currentYear - 1 : currentYear;
-
-  // Generate 4 rolling academic years: [baseYear - 1, baseYear, baseYear + 1, baseYear + 2]
   const yearsToEnsure = [baseYear - 1, baseYear, baseYear + 1, baseYear + 2];
 
   for (const y of yearsToEnsure) {
     const name = `${y}-${y + 1}`;
-    const startDate = new Date(Date.UTC(y, 5, 1)); // 01-06-YYYY
-    const endDate = new Date(Date.UTC(y + 1, 4, 31)); // 31-05-YYYY+1
+    const startDate = new Date(Date.UTC(y, 5, 1));
+    const endDate = new Date(Date.UTC(y + 1, 4, 31));
 
-    await db
-      .insert(academicYears)
-      .values({
-        name,
-        startDate,
-        endDate,
-        status: "active",
-        createdBy: "00000000-0000-0000-0000-000000000001",
-        updatedBy: "00000000-0000-0000-0000-000000000001",
-      })
-      .onConflictDoNothing({ target: academicYears.name });
+    try {
+      await db
+        .insert(academicYears)
+        .values({
+          name,
+          startDate,
+          endDate,
+          status: "active",
+          createdBy: "00000000-0000-0000-0000-000000000001",
+          updatedBy: "00000000-0000-0000-0000-000000000001",
+        })
+        .onConflictDoNothing({ target: academicYears.name });
+    } catch {
+      try {
+        await supabase.from("academic_years").upsert({
+          name,
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          status: "active",
+        }, { onConflict: "name" });
+      } catch {}
+    }
   }
 }
 
@@ -45,11 +53,31 @@ export async function getAllAcademicYearsAction(): Promise<ApiResponse<AcademicY
   try {
     await ensureDefaultAcademicYears();
 
-    const items = await db
-      .select()
-      .from(academicYears)
-      .where(isNull(academicYears.deletedAt))
-      .orderBy(desc(academicYears.startDate));
+    let items: AcademicYearSelect[] = [];
+    try {
+      items = await db
+        .select()
+        .from(academicYears)
+        .where(isNull(academicYears.deletedAt))
+        .orderBy(desc(academicYears.startDate));
+    } catch (err) {
+      logger.error("[Action: getAllAcademicYearsAction] Drizzle query error", err);
+    }
+
+    if (items.length === 0) {
+      try {
+        const { data } = await supabase
+          .from("academic_years")
+          .select("*")
+          .is("deleted_at", null)
+          .order("start_date", { ascending: false });
+        if (data && data.length > 0) {
+          items = toCamelCase<AcademicYearSelect[]>(data);
+        }
+      } catch (restErr) {
+        logger.error("[Action: getAllAcademicYearsAction] REST fallback error", restErr);
+      }
+    }
 
     return { success: true, data: items };
   } catch (error) {
