@@ -23,7 +23,7 @@ export function PublicHeader() {
           </div>
           <div>
             <span className="text-lg font-bold tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
-              Robotics Club
+              🤖 Robotics Club
             </span>
           </div>
         </Link>

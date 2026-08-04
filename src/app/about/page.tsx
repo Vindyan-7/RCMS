@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { PublicHeader } from "@/components/public/public-header";
 import { PublicFooter } from "@/components/public/public-footer";
 import { Bot, Cpu, Zap, Layers, Award, Target, Compass, Users } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "About",
+};
 
 export default function AboutPage() {
   return (

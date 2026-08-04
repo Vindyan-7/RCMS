@@ -2,8 +2,22 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RCMS — Robotics Club Management System",
-  description: "Internal management platform for SAC Robotics Club",
+  title: {
+    default: "Robotics Club",
+    template: "%s | Robotics Club",
+  },
+  description: "Official Robotics Club Portal",
+  openGraph: {
+    title: "Robotics Club",
+    description: "Official Robotics Club Portal",
+    siteName: "Robotics Club",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Robotics Club",
+    description: "Official Robotics Club Portal",
+  },
 };
 
 export default function RootLayout({

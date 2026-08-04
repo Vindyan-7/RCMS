@@ -74,7 +74,7 @@ export function PublicFooter() {
         </div>
 
         <div className="mt-8 border-t border-slate-100 pt-6 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400">
-          <p>© {new Date().getFullYear()} SAC Robotics Club System (RCMS). All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Student Activity Council — Robotics Club. All rights reserved.</p>
           <p className="mt-2 sm:mt-0 flex items-center space-x-1">
             <span>Built with precision for Robotics Club Members</span>
           </p>

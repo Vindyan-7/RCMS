@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { PublicHeader } from "@/components/public/public-header";
 import { PublicFooter } from "@/components/public/public-footer";
 import { getPublicLeaderboardAction } from "@/actions/public/public_leaderboard.actions";
@@ -5,6 +6,10 @@ import { PublicLeaderboardClient } from "@/components/public/public-leaderboard-
 import { Trophy, ShieldCheck, Award } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Leaderboard",
+};
 
 export default async function PublicLeaderboardPage() {
   const leaderboardRes = await getPublicLeaderboardAction();
