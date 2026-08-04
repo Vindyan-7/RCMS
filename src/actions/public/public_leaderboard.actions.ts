@@ -51,7 +51,7 @@ export async function getPublicLeaderboardAction(): Promise<{
 
     const activeSemesterId = semData && semData[0] ? semData[0].id : null;
 
-    // 2. Fetch enrolled members for active semester (or fallback to active members)
+    // 2. Fetch enrolled members for active semester
     let enrolledMembers: any[] = [];
     if (activeSemesterId) {
       const { data: memsData } = await supabase
@@ -66,10 +66,8 @@ export async function getPublicLeaderboardAction(): Promise<{
           .filter((m: any) => m.members && m.members.status === "active")
           .map((m: any) => m.members);
       }
-    }
-
-    // Fallback if no active semester memberships found
-    if (enrolledMembers.length === 0) {
+    } else {
+      // Fallback ONLY when no active semester exists in database
       const { data: allMems } = await supabase
         .from("members")
         .select("id, name, member_id, club_membership_id, roll_number, branch")
