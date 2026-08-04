@@ -262,4 +262,17 @@ export class AttendanceRecordsRepository {
       return false;
     }
   }
+
+  public async deleteByMemberAndSession(memberId: UUID, sessionId: UUID): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from("attendance_records")
+        .delete()
+        .eq("member_id", memberId)
+        .eq("session_id", sessionId);
+      return !error;
+    } catch {
+      return false;
+    }
+  }
 }

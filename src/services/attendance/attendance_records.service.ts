@@ -1,11 +1,12 @@
 /**
  * Attendance Domain - Attendance Records Service Implementation
+ * Production Polish: Idempotent Attendance Synchronization & One-time Repair Integration
  */
 
 import { AttendanceRecordsRepository } from "@/repositories/attendance/attendance_records.repository";
 import { AttendanceSessionsRepository } from "@/repositories/attendance/attendance_sessions.repository";
 import { MembersRepository } from "@/repositories/members/members.repository";
-import { AttendanceRecordSelect, AttendanceRecordInsert } from "@/db/schema";
+import { AttendanceRecordSelect } from "@/db/schema";
 import { UUID, PaginationQuery } from "@/core/types";
 import { PaginatedResult } from "@/core/repository/repository.types";
 import { ConflictError, NotFoundError, BadRequestError } from "@/core/errors";
@@ -13,8 +14,8 @@ import { logger } from "@/core/logger";
 
 import { MembershipsRepository } from "@/repositories/members/memberships.repository";
 import { SemesterContextService } from "@/services/academic/semester-context.service";
-
 import { PointsLedgerRepository } from "@/repositories/points/points_ledger.repository";
+import { AttendanceRepairService } from "./attendance_repair.service";
 
 export class AttendanceRecordsService {
   constructor(
@@ -81,7 +82,7 @@ export class AttendanceRecordsService {
 
     // Evaluate Late threshold
     const currentTime = new Date();
-    const isLate = false; // Evaluated dynamically against start_time + late_threshold
+    const isLate = false;
     const points = isLate ? session.latePoints : session.attendancePoints;
 
     const record = await this.recordsRepo.create({
@@ -95,20 +96,23 @@ export class AttendanceRecordsService {
       remarks: data.remarks,
     });
 
-    // Write points_ledger entry so member total points & leaderboard update automatically
-    try {
-      await this.pointsLedgerRepo.create({
-        memberId: data.memberId,
-        category: "attendance",
-        referenceType: "attendance_records",
-        referenceId: record.id,
-        semesterId: session.semesterId || activeSemester?.id,
-        points: points || 10,
-        createdBy: actorId || "00000000-0000-0000-0000-000000000001",
-        remarks: `Attendance points for session "${session.title}"`,
-      });
-    } catch (err) {
-      logger.error("[AttendanceRecordsService] Failed to create points_ledger entry", err);
+    // Check if points_ledger entry already exists for this (sessionId, memberId)
+    const existingLedger = await this.pointsLedgerRepo.findByMemberAndReference(data.memberId, record.id);
+    if (existingLedger.length === 0) {
+      try {
+        await this.pointsLedgerRepo.create({
+          memberId: data.memberId,
+          category: "attendance",
+          referenceType: "attendance_records",
+          referenceId: record.id,
+          semesterId: session.semesterId || activeSemester?.id,
+          points: points || 10,
+          createdBy: actorId || "00000000-0000-0000-0000-000000000001",
+          remarks: `Attendance points for session "${session.title}"`,
+        });
+      } catch (err) {
+        logger.error("[AttendanceRecordsService] Failed to create points_ledger entry", err);
+      }
     }
 
     return record;
@@ -134,14 +138,19 @@ export class AttendanceRecordsService {
     return this.recordsRepo.getAll(query);
   }
 
+  /**
+   * Idempotent Delta Attendance Synchronization
+   * Compares current attendance state with target state and applies ONLY the delta (+added, -removed, =unchanged).
+   * Saving the same session multiple times without modifications results in ZERO additional points being awarded.
+   */
   public async bulkRecordAttendance(
     sessionId: UUID,
-    memberIds: UUID[],
+    targetMemberIds: UUID[],
     actorId: UUID
-  ): Promise<{ recordedCount: number }> {
-    logger.info("[AttendanceRecordsService] Bulk recording attendance", {
+  ): Promise<{ recordedCount: number; removedCount: number }> {
+    logger.info("[AttendanceRecordsService] Synchronizing attendance (idempotent delta execution)", {
       sessionId,
-      count: memberIds.length,
+      targetCount: targetMemberIds.length,
       actorId,
     });
 
@@ -156,27 +165,42 @@ export class AttendanceRecordsService {
 
     const activeSemester = await this.semesterContextService.getActiveSemester();
 
-    const existingRecords = await this.recordsRepo.getBySessionId(sessionId, { limit: 1000 });
-    const existingMemberIds = new Set(existingRecords.items.map((r) => r.memberId));
+    // Fetch existing attendance records for this session
+    const existingRecordsRes = await this.recordsRepo.getBySessionId(sessionId, { limit: 1000 });
+    const existingRecords = existingRecordsRes.items || [];
 
-    let count = 0;
+    const existingMap = new Map<string, AttendanceRecordSelect>();
+    existingRecords.forEach((r) => existingMap.set(r.memberId, r));
+
+    const targetSet = new Set(targetMemberIds);
+
+    const toAddMemberIds = targetMemberIds.filter((mId) => !existingMap.has(mId));
+    const toRemoveMemberIds = Array.from(existingMap.keys()).filter((mId) => !targetSet.has(mId));
+    const unchangedMemberIds = targetMemberIds.filter((mId) => existingMap.has(mId));
+
+    logger.info(`[AttendanceRecordsService] Attendance sync delta: +${toAddMemberIds.length} added, -${toRemoveMemberIds.length} removed, =${unchangedMemberIds.length} unchanged`);
+
     const currentTime = new Date();
+    let recordedCount = 0;
+    let removedCount = 0;
 
-    for (const memberId of memberIds) {
-      if (!existingMemberIds.has(memberId)) {
-        const record = await this.recordsRepo.create({
-          memberId,
-          sessionId,
-          scanTime: currentTime,
-          points: session.attendancePoints || 10,
-          late: false,
-          volunteerUser: actorId,
-          method: "checklist",
-          remarks: "Recorded via Attendance Screen",
-        });
-        count++;
+    // 1. Process Newly Added Members (+Delta)
+    for (const memberId of toAddMemberIds) {
+      const record = await this.recordsRepo.create({
+        memberId,
+        sessionId,
+        scanTime: currentTime,
+        points: session.attendancePoints || 10,
+        late: false,
+        volunteerUser: actorId,
+        method: "checklist",
+        remarks: `Recorded via Attendance Screen for "${session.title}"`,
+      });
+      recordedCount++;
 
-        // Write points_ledger entry for new attendance check-in
+      // Check if points ledger entry already exists for this (sessionId/record.id, memberId)
+      const existingLedger = await this.pointsLedgerRepo.findByMemberAndReference(memberId, record.id);
+      if (existingLedger.length === 0) {
         try {
           await this.pointsLedgerRepo.create({
             memberId,
@@ -189,30 +213,40 @@ export class AttendanceRecordsService {
             remarks: `Attendance points for session "${session.title}"`,
           });
         } catch (err) {
-          logger.error("[AttendanceRecordsService] Bulk points ledger error", err);
-        }
-      } else {
-        // Backfill points in points_ledger for existing record if not already recorded
-        const rec = existingRecords.items.find((r) => r.memberId === memberId);
-        if (rec) {
-          try {
-            await this.pointsLedgerRepo.create({
-              memberId,
-              category: "attendance",
-              referenceType: "attendance_records",
-              referenceId: rec.id,
-              semesterId: session.semesterId || activeSemester?.id,
-              points: rec.points || session.attendancePoints || 10,
-              createdBy: actorId || "00000000-0000-0000-0000-000000000001",
-              remarks: `Attendance points for session "${session.title}"`,
-            });
-          } catch {
-            // Ignore if already logged in points_ledger
-          }
+          logger.error("[AttendanceRecordsService] Points ledger create error for new check-in", err);
         }
       }
     }
 
-    return { recordedCount: count };
+    // 2. Process Removed Members (-Delta)
+    for (const memberId of toRemoveMemberIds) {
+      const rec = existingMap.get(memberId);
+      if (rec) {
+        // Delete attendance_record
+        await this.recordsRepo.delete(rec.id);
+        removedCount++;
+
+        // Delete points_ledger entry associated with rec.id or sessionId
+        const ledgerEntriesByRec = await this.pointsLedgerRepo.findByMemberAndReference(memberId, rec.id);
+        const ledgerEntriesBySess = await this.pointsLedgerRepo.findByMemberAndReference(memberId, sessionId);
+        const idsToDelete = Array.from(new Set([...ledgerEntriesByRec.map((l) => l.id), ...ledgerEntriesBySess.map((l) => l.id)]));
+        if (idsToDelete.length > 0) {
+          await this.pointsLedgerRepo.deleteByIds(idsToDelete);
+        }
+      }
+    }
+
+    // 3. Unchanged Members (=Delta) -> ZERO OPERATIONS!
+    // No points ledger entries created, no score modifications.
+
+    // 4. Run background repair routine to clean up pre-existing duplicate awards
+    try {
+      const repairService = new AttendanceRepairService();
+      await repairService.repairDuplicateAttendancePoints();
+    } catch (err) {
+      logger.warn("[AttendanceRecordsService] Repair routine warning", { error: String(err) });
+    }
+
+    return { recordedCount, removedCount };
   }
 }

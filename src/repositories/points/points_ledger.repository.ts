@@ -49,6 +49,38 @@ export class PointsLedgerRepository {
     return toCamelCase<PointsLedgerSelect>(data);
   }
 
+  public async findByCategory(category: string): Promise<PointsLedgerSelect[]> {
+    const { data, error } = await db
+      .from(this.tableName)
+      .select("*")
+      .eq("category", category);
+
+    if (error || !data) return [];
+    return toCamelCase<PointsLedgerSelect[]>(data);
+  }
+
+  public async findByMemberAndReference(memberId: UUID, referenceId: UUID): Promise<PointsLedgerSelect[]> {
+    const { data, error } = await db
+      .from(this.tableName)
+      .select("*")
+      .eq("member_id", memberId)
+      .eq("reference_id", referenceId);
+
+    if (error || !data) return [];
+    return toCamelCase<PointsLedgerSelect[]>(data);
+  }
+
+  public async deleteById(id: UUID): Promise<boolean> {
+    const { error } = await db.from(this.tableName).delete().eq("id", id);
+    return !error;
+  }
+
+  public async deleteByIds(ids: UUID[]): Promise<boolean> {
+    if (!ids || ids.length === 0) return true;
+    const { error } = await db.from(this.tableName).delete().in("id", ids);
+    return !error;
+  }
+
   public async getByMemberId(
     memberId: UUID,
     query: PaginationQuery

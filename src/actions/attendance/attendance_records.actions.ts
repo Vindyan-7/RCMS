@@ -51,24 +51,6 @@ export async function recordAttendanceAction(
 
     logger.info("[Action: recordAttendanceAction] Action completed successfully", { id: record.id });
 
-    // Sync attendance points to points_ledger
-    try {
-      const pts = Number((record as any).points ?? 0);
-      if (pts > 0) {
-        await ledgerRepo.create({
-          memberId: record.memberId,
-          category: "attendance",
-          referenceType: "attendance_record",
-          referenceId: record.id,
-          points: pts,
-          createdBy: actor.id,
-          remarks: `Attendance recorded for session ${record.sessionId}`,
-        });
-      }
-    } catch (ledgerErr) {
-      logger.warn("[Action: recordAttendanceAction] Ledger sync skipped", { error: String(ledgerErr) });
-    }
-
     return {
       success: true,
       data: record,
@@ -333,7 +315,7 @@ export async function exportAttendanceRecordsCsvAction(
 export async function bulkRecordAttendanceAction(
   sessionId: string,
   memberIds: string[]
-): Promise<ApiResponse<{ recordedCount: number }>> {
+): Promise<ApiResponse<{ recordedCount: number; removedCount?: number }>> {
   logger.info("[Action: bulkRecordAttendanceAction] Bulk recording attendance", { sessionId, count: memberIds.length });
   try {
     const actor = await getActorContext();
@@ -347,6 +329,23 @@ export async function bulkRecordAttendanceAction(
     };
   } catch (error) {
     logger.error("[Action: bulkRecordAttendanceAction] Execution failed", error);
+    return formatErrorResponse(error);
+  }
+}
+
+export async function repairAttendancePointsAction(): Promise<ApiResponse<any>> {
+  logger.info("[Action: repairAttendancePointsAction] Initiating attendance points repair routine");
+  try {
+    const { AttendanceRepairService } = await import("@/services/attendance/attendance_repair.service");
+    const repairService = new AttendanceRepairService();
+    const result = await repairService.repairDuplicateAttendancePoints();
+
+    return {
+      success: true,
+      data: result,
+    };
+  } catch (error) {
+    logger.error("[Action: repairAttendancePointsAction] Execution failed", error);
     return formatErrorResponse(error);
   }
 }
