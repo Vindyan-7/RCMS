@@ -27,11 +27,12 @@ export interface TeamStudioInitialResponse {
   completedLiveSessions: AttendanceSessionSummary[];
   selectedSession: AttendanceSessionSummary | null;
   presentMembers: PresentMemberItem[];
+  enrolledMembers: PresentMemberItem[];
 }
 
 export class TeamStudioService {
   public async getTeamStudioInitialData(selectedSessionId?: string): Promise<TeamStudioInitialResponse> {
-    logger.info("[TeamStudioService] Fetching Team Studio foundation data for completed LIVE attendance sessions");
+    logger.info("[TeamStudioService] Fetching Team Studio hybrid data (Live Sessions & Active Semester Enrolled Members)");
 
     // 1. Fetch active semester
     const { data: semData } = await supabase
@@ -44,7 +45,22 @@ export class TeamStudioService {
     const activeSem = semData && semData[0] ? semData[0] : null;
     const activeSemesterName = activeSem?.name || "ROBOTICS_B1_2026";
 
-    // 2. Fetch ALL completed LIVE attendance sessions
+    // 2. Fetch Active Semester Enrolled Members for Quick Tools
+    const { data: allActiveMems } = await supabase
+      .from("members")
+      .select("id, name, member_id, club_membership_id, branch, year, status")
+      .eq("status", "active")
+      .is("deleted_at", null);
+
+    const enrolledMembers: PresentMemberItem[] = (allActiveMems || []).map((m: any) => ({
+      memberId: m.id,
+      name: m.name || "Member",
+      membershipId: m.club_membership_id || m.member_id || "SAC-RC-0000",
+      branch: (m.branch || "ECE").toUpperCase(),
+      year: m.year || 1,
+    }));
+
+    // 3. Fetch ALL completed LIVE attendance sessions
     let sessQuery = supabase
       .from("attendance_sessions")
       .select("id, title, date, status, type, semester_id, created_at, updated_at, created_by, semesters(name)")
@@ -61,24 +77,23 @@ export class TeamStudioService {
     const sessions = rawSessions || [];
 
     if (sessions.length === 0) {
-      // Return empty state response if no completed live session exists
       return {
         activeSemesterName,
         completedLiveSessions: [],
         selectedSession: null,
         presentMembers: [],
+        enrolledMembers,
       };
     }
 
-    // 3. Collect session IDs and fetch attendance records & members
+    // 4. Collect session IDs and fetch attendance records
     const sessionIds = sessions.map((s: any) => s.id);
-    const [attRecRes, memsCountRes] = await Promise.all([
+    const [attRecRes] = await Promise.all([
       supabase.from("attendance_records").select("id, session_id, member_id, late, scan_time").in("session_id", sessionIds),
-      supabase.from("members").select("id, status").eq("status", "active").is("deleted_at", null),
     ]);
 
     const attRecords = attRecRes.data || [];
-    const totalEnrolledCount = (memsCountRes.data || []).length || 1;
+    const totalEnrolledCount = enrolledMembers.length || 1;
 
     // Group records by session
     const sessionRecordsMap: Record<string, any[]> = {};
@@ -119,27 +134,14 @@ export class TeamStudioService {
       if (found) targetSession = found;
     }
 
-    // 4. Fetch present members strictly for the target session
+    // 5. Fetch present members strictly for the target session
     const targetRecs = sessionRecordsMap[targetSession.sessionId] || [];
     const targetMemberIds = targetRecs.map((r: any) => r.member_id).filter(Boolean);
 
     let presentMembers: PresentMemberItem[] = [];
     if (targetMemberIds.length > 0) {
-      const { data: membersData } = await supabase
-        .from("members")
-        .select("id, name, member_id, club_membership_id, branch, year")
-        .in("id", targetMemberIds)
-        .is("deleted_at", null);
-
-      if (membersData) {
-        presentMembers = membersData.map((m: any) => ({
-          memberId: m.id,
-          name: m.name || "Member",
-          membershipId: m.club_membership_id || m.member_id || "SAC-RC-0000",
-          branch: (m.branch || "ECE").toUpperCase(),
-          year: m.year || 1,
-        }));
-      }
+      const presentMembersList = enrolledMembers.filter((m) => targetMemberIds.includes(m.memberId));
+      presentMembers = presentMembersList;
     }
 
     return {
@@ -147,6 +149,7 @@ export class TeamStudioService {
       completedLiveSessions,
       selectedSession: targetSession,
       presentMembers,
+      enrolledMembers,
     };
   }
 }
