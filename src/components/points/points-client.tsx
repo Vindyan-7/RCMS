@@ -115,10 +115,17 @@ export function PointsClient({ initialLeaderboard, initialTasks = [] }: PointsCl
   // ── Derived ─────────────────────────────────────────────────────
   const selectedTask = activeTasks.find((t) => t.id === selectedTaskId) ?? null;
 
-  const filteredLeaderboard = leaderboard.filter((item) =>
-    item.memberName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.rollNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-  );
+  const filteredLeaderboard = leaderboard.filter((item) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+
+    const nameMatch = item.memberName?.toLowerCase().includes(q) ?? false;
+    const rollMatch = item.rollNumber?.toLowerCase().includes(q) ?? false;
+    const memberIdMatch = item.memberId?.toLowerCase().includes(q) ?? false;
+    const membershipIdMatch = item.membershipId?.toLowerCase().includes(q) ?? false;
+
+    return nameMatch || rollMatch || memberIdMatch || membershipIdMatch;
+  });
 
   // ── Helpers ──────────────────────────────────────────────────────
   const refreshLeaderboard = useCallback(() => {
@@ -508,7 +515,7 @@ export function PointsClient({ initialLeaderboard, initialTasks = [] }: PointsCl
               <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search members to award..."
+                placeholder="Search by name, roll number, member ID or club ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full rounded-lg border border-border bg-card pl-9 pr-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-blue-500"
