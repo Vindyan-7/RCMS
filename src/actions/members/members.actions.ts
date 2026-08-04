@@ -540,3 +540,98 @@ export async function exportMemberTimelineCsvAction(memberId: string): Promise<A
     return formatErrorResponse(err);
   }
 }
+
+export async function exportMemberFullProfileCsvAction(memberId: string): Promise<ApiResponse<{ csvContent: string; filename: string }>> {
+  try {
+    const wsRes = await getMemberWorkspaceDataAction(memberId);
+    if (!wsRes.success || !wsRes.data) throw new Error("Member not found");
+    const {
+      member,
+      activeSemesterName,
+      membershipStatus,
+      totalPoints,
+      attendanceRate,
+      presentCount,
+      tasksCompletedCount,
+      eventsParticipatedCount,
+      attendance,
+      tasks,
+      events,
+      pointsLedger,
+      membershipHistory,
+    } = wsRes.data;
+
+    const sections: string[] = [];
+
+    // 1. Profile Summary
+    sections.push("=== MEMBER PROFILE SUMMARY ===");
+    sections.push(["Full Name", "Membership ID", "System Member ID", "Roll Number", "Branch", "Year", "Email", "Phone", "Status", "Active Semester"].map(escapeCsv).join(","));
+    sections.push([
+      member.name,
+      member.clubMembershipId || member.memberId || "—",
+      member.memberId || "—",
+      member.rollNumber,
+      member.branch || "ECE",
+      `Yr ${member.year || 1}`,
+      member.email,
+      member.phone,
+      membershipStatus.toUpperCase(),
+      activeSemesterName,
+    ].map(escapeCsv).join(","));
+
+    // 2. Performance Summary Metrics
+    sections.push("\n=== PERFORMANCE METRICS ===");
+    sections.push(["Total Points", "Attendance Rate", "Present Sessions", "Tasks Completed", "Events Participated", "Total Renewals"].map(escapeCsv).join(","));
+    sections.push([
+      String(totalPoints),
+      `${attendanceRate}%`,
+      String(presentCount),
+      String(tasksCompletedCount),
+      String(eventsParticipatedCount),
+      String(membershipHistory.length),
+    ].map(escapeCsv).join(","));
+
+    // 3. Attendance Records
+    sections.push("\n=== ATTENDANCE RECORDS ===");
+    sections.push(["Session Title", "Date", "Status", "Late Status", "Points Awarded", "Method", "Volunteer"].map(escapeCsv).join(","));
+    attendance.forEach((a: any) => {
+      sections.push([a.sessionTitle, new Date(a.sessionDate).toLocaleDateString("en-IN"), a.status, a.late ? "Late" : "On Time", String(a.points), a.method, a.volunteerName].map(escapeCsv).join(","));
+    });
+
+    // 4. Technical Tasks
+    sections.push("\n=== TECHNICAL TASKS ===");
+    sections.push(["Task Title", "Category", "Points Awarded", "Completion Date", "Verifier", "Status"].map(escapeCsv).join(","));
+    tasks.forEach((t: any) => {
+      sections.push([t.title, t.category, String(t.points), new Date(t.completionDate).toLocaleString("en-IN"), t.verifierName, t.status].map(escapeCsv).join(","));
+    });
+
+    // 5. Events Participated
+    sections.push("\n=== EVENTS PARTICIPATED ===");
+    sections.push(["Event Name", "Venue", "Start Date", "Participation Status", "Verification Status", "Points Awarded"].map(escapeCsv).join(","));
+    events.forEach((e: any) => {
+      sections.push([e.eventName, e.venue, new Date(e.startDate).toLocaleDateString("en-IN"), e.participationStatus, e.verificationStatus, String(e.points)].map(escapeCsv).join(","));
+    });
+
+    // 6. Points Ledger
+    sections.push("\n=== POINTS LEDGER TRANSACTIONS ===");
+    sections.push(["Date", "Remarks", "Category", "Points", "Verifier"].map(escapeCsv).join(","));
+    pointsLedger.forEach((l: any) => {
+      sections.push([new Date(l.date).toLocaleString("en-IN"), l.remarks, l.category, String(l.points), l.verifierName].map(escapeCsv).join(","));
+    });
+
+    // 7. Membership History
+    sections.push("\n=== MEMBERSHIP LIFECYCLE HISTORY ===");
+    sections.push(["Semester", "Academic Year", "Membership ID", "Joined Date", "Status"].map(escapeCsv).join(","));
+    membershipHistory.forEach((m: any) => {
+      sections.push([m.semesterName, m.academicYearName, m.membershipId, new Date(m.joinDate).toLocaleDateString("en-IN"), m.status].map(escapeCsv).join(","));
+    });
+
+    const csvContent = "\uFEFF" + sections.join("\r\n");
+    const memIdStr = (member.clubMembershipId || member.memberId || "member").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const filename = `member_profile_${memIdStr}.csv`;
+
+    return { success: true, data: { csvContent, filename } };
+  } catch (err: any) {
+    return formatErrorResponse(err);
+  }
+}

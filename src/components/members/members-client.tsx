@@ -2,7 +2,7 @@
 
 /**
  * Members Domain - Members Directory & Central Member Intelligence Workspace Component
- * Production Polish: Single consolidated fetch, full lifecycle timeline, 7 tabs, zero UUIDs, enriched CSV exports
+ * Production Polish: Quick Activity Summary, Achievements Tab, Color-Coded Activity Timeline, Read-Only Profile Card, Full Profile CSV Export
  */
 
 import { useState, useRef, useTransition, useEffect, useCallback } from "react";
@@ -14,6 +14,7 @@ import {
   importMembersCsvAction,
   getMemberWorkspaceDataAction,
   exportMemberTimelineCsvAction,
+  exportMemberFullProfileCsvAction,
 } from "@/actions/members/members.actions";
 import { renewMembershipAction } from "@/actions/members/memberships.actions";
 import { MemberSelect } from "@/db/schema";
@@ -51,6 +52,7 @@ import {
   ChevronRight,
   Info,
   Trophy,
+  Lock,
 } from "lucide-react";
 
 interface MembersClientProps {
@@ -72,7 +74,7 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
   const [activeWorkspaceMember, setActiveWorkspaceMember] = useState<MemberSelect | null>(null);
   const [workspaceData, setWorkspaceData] = useState<any | null>(null);
   const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false);
-  const [workspaceTab, setWorkspaceTab] = useState<"timeline" | "attendance" | "tasks" | "events" | "points" | "history" | "profile">("timeline");
+  const [workspaceTab, setWorkspaceTab] = useState<"timeline" | "attendance" | "tasks" | "events" | "points" | "history" | "profile" | "achievements">("timeline");
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -135,9 +137,9 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
     });
   };
 
-  const handleExportTimelineCsv = async (memberId: string) => {
+  const handleExportFullProfileCsv = async (memberId: string) => {
     startTransition(async () => {
-      const res = await exportMemberTimelineCsvAction(memberId);
+      const res = await exportMemberFullProfileCsvAction(memberId);
       if (res.success && res.data) {
         const blob = new Blob([res.data.csvContent], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
@@ -148,7 +150,7 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
         link.click();
         document.body.removeChild(link);
       } else {
-        alert(res.error?.message || "Failed to export timeline CSV");
+        alert(res.error?.message || "Failed to export member profile CSV");
       }
     });
   };
@@ -553,390 +555,531 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
       {/* ── CONSOLIDATED MEMBER WORKSPACE SLIDE-OVER PANEL ──────────────────── */}
       {activeWorkspaceMember && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-3xl bg-card border-l border-border h-full overflow-y-auto p-6 shadow-2xl space-y-6 animate-in slide-in-from-right duration-200">
+          <div className="w-full max-w-3xl bg-card border-l border-border h-full overflow-y-auto shadow-2xl animate-in slide-in-from-right duration-200 flex flex-col">
             
-            {/* 1. Workspace Header */}
-            <div className="flex justify-between items-start border-b border-border pb-4">
-              <div className="flex items-center space-x-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-950 text-blue-400 font-bold text-lg border border-blue-800/60 shadow-md">
-                  {getInitials(activeWorkspaceMember.name || "Member")}
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-bold text-foreground">{activeWorkspaceMember.name}</h2>
-                    <Badge variant={workspaceData?.membershipStatus === "active" ? "success" : "secondary"} className="capitalize text-xs">
-                      {workspaceData?.membershipStatus || activeWorkspaceMember.status}
-                    </Badge>
+            {/* 1. Sticky Workspace Header & Quick Activity Dashboard (Phase 1) */}
+            <div className="sticky top-0 z-20 bg-card/95 backdrop-blur-md border-b border-border p-5 space-y-4 shadow-sm">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center space-x-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-950 text-blue-400 font-bold text-lg border border-blue-800/60 shadow-md">
+                    {getInitials(activeWorkspaceMember.name || "Member")}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono flex-wrap">
-                    <span className="text-blue-400 font-bold">{activeWorkspaceMember.clubMembershipId || activeWorkspaceMember.memberId || "SAC-RC-0000"}</span>
-                    <span>•</span>
-                    <span>Roll: {activeWorkspaceMember.rollNumber}</span>
-                    <span>•</span>
-                    <span>{activeWorkspaceMember.branch || "ECE"} (Yr {activeWorkspaceMember.year || 1})</span>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-2xl font-bold text-foreground">{activeWorkspaceMember.name}</h2>
+                      <Badge variant={workspaceData?.membershipStatus === "active" ? "success" : "secondary"} className="capitalize text-xs">
+                        {workspaceData?.membershipStatus || activeWorkspaceMember.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono flex-wrap">
+                      <span className="text-blue-400 font-bold">{activeWorkspaceMember.clubMembershipId || activeWorkspaceMember.memberId || "SAC-RC-0000"}</span>
+                      <span>•</span>
+                      <span>Roll: {activeWorkspaceMember.rollNumber}</span>
+                      <span>•</span>
+                      <span>{activeWorkspaceMember.branch || "ECE"} (Yr {activeWorkspaceMember.year || 1})</span>
+                    </div>
                   </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Button
+                    size="sm"
+                    onClick={() => handleRenewMemberWorkspace(activeWorkspaceMember.id)}
+                    disabled={isPending}
+                    className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-sm"
+                  >
+                    Renew Membership
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleExportFullProfileCsv(activeWorkspaceMember.id)}
+                    disabled={isPending}
+                    className="text-xs border-border bg-card gap-1 shadow-sm"
+                  >
+                    <Download className="h-3.5 w-3.5 text-emerald-400" /> Export Member CSV
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => setActiveWorkspaceMember(null)}>
+                    <X className="h-5 w-5" />
+                  </Button>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Button
-                  size="sm"
-                  onClick={() => handleRenewMemberWorkspace(activeWorkspaceMember.id)}
-                  disabled={isPending}
-                  className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
-                >
-                  Renew Membership
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleExportTimelineCsv(activeWorkspaceMember.id)}
-                  disabled={isPending}
-                  className="text-xs border-border bg-card gap-1"
-                >
-                  <Download className="h-3.5 w-3.5 text-emerald-400" /> Export CSV
-                </Button>
-                <Button variant="ghost" size="icon" onClick={() => setActiveWorkspaceMember(null)}>
-                  <X className="h-5 w-5" />
-                </Button>
+              {/* Phase 1 Dashboard: Clean Activity Summary (10 Cards) */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5 text-center space-y-0.5">
+                  <div className="text-[9px] font-bold text-muted-foreground uppercase">Member ID</div>
+                  <div className="text-xs font-mono font-bold text-blue-400 truncate">
+                    {activeWorkspaceMember.clubMembershipId || activeWorkspaceMember.memberId || "RCMS026"}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5 text-center space-y-0.5">
+                  <div className="text-[9px] font-bold text-muted-foreground uppercase">Current Semester</div>
+                  <div className="text-xs font-bold text-foreground truncate">
+                    {workspaceData?.activeSemesterName || "ROBOTICS_B1_2026"}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-2.5 text-center space-y-0.5">
+                  <div className="text-[9px] font-bold text-amber-400 uppercase">Current Rank</div>
+                  <div className="text-sm font-bold text-amber-300">#{workspaceData?.leaderboardRank ?? 1}</div>
+                </div>
+
+                <div className="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-2.5 text-center space-y-0.5">
+                  <div className="text-[9px] font-bold text-emerald-400 uppercase">Current Points</div>
+                  <div className="text-sm font-bold text-emerald-300">{workspaceData?.totalPoints ?? 0} Pts</div>
+                </div>
+
+                <div className="rounded-xl border border-blue-800/40 bg-blue-950/20 p-2.5 text-center space-y-0.5">
+                  <div className="text-[9px] font-bold text-blue-400 uppercase">Attendance</div>
+                  <div className="text-sm font-bold text-blue-300">{workspaceData?.attendanceRate ?? 0}%</div>
+                </div>
+
+                <div className="rounded-xl border border-purple-800/40 bg-purple-950/20 p-2.5 text-center space-y-0.5">
+                  <div className="text-[9px] font-bold text-purple-400 uppercase">Technical Tasks</div>
+                  <div className="text-xs font-bold text-purple-300">{workspaceData?.tasksCompletedCount ?? 0} Completed</div>
+                </div>
+
+                <div className="rounded-xl border border-blue-800/40 bg-blue-950/20 p-2.5 text-center space-y-0.5">
+                  <div className="text-[9px] font-bold text-blue-400 uppercase">Events</div>
+                  <div className="text-xs font-bold text-blue-300">{workspaceData?.eventsParticipatedCount ?? 0} Participated</div>
+                </div>
+
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5 text-center space-y-0.5">
+                  <div className="text-[9px] font-bold text-muted-foreground uppercase">Semester Renewals</div>
+                  <div className="text-sm font-bold text-foreground">{workspaceData?.membershipHistory?.length ?? 1}</div>
+                </div>
+
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5 text-center space-y-0.5">
+                  <div className="text-[9px] font-bold text-muted-foreground uppercase">Joined Club</div>
+                  <div className="text-xs font-bold text-foreground">
+                    {activeWorkspaceMember.createdAt ? new Date(activeWorkspaceMember.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "August 2025"}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-2.5 text-center space-y-0.5">
+                  <div className="text-[9px] font-bold text-emerald-400 uppercase">Current Status</div>
+                  <div className="text-xs font-bold text-emerald-300 capitalize">
+                    {workspaceData?.membershipStatus || activeWorkspaceMember.status || "Active"}
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* 2. Summary Statistics Grid (8 Metrics Cards) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-              <div className="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-2.5 text-center space-y-0.5">
-                <div className="text-[9px] font-bold text-emerald-400 uppercase">Points</div>
-                <div className="text-base font-bold text-emerald-300">{workspaceData?.totalPoints ?? 0}</div>
-              </div>
-              <div className="rounded-xl border border-blue-800/40 bg-blue-950/20 p-2.5 text-center space-y-0.5">
-                <div className="text-[9px] font-bold text-blue-400 uppercase">Attendance</div>
-                <div className="text-base font-bold text-blue-300">{workspaceData?.attendanceRate ?? 0}%</div>
-              </div>
-              <div className="rounded-xl border border-purple-800/40 bg-purple-950/20 p-2.5 text-center space-y-0.5">
-                <div className="text-[9px] font-bold text-purple-400 uppercase">Tasks</div>
-                <div className="text-base font-bold text-purple-300">{workspaceData?.tasksCompletedCount ?? 0}</div>
-              </div>
-              <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-2.5 text-center space-y-0.5">
-                <div className="text-[9px] font-bold text-amber-400 uppercase">Events</div>
-                <div className="text-base font-bold text-amber-300">{workspaceData?.eventsParticipatedCount ?? 0}</div>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5 text-center space-y-0.5">
-                <div className="text-[9px] font-bold text-muted-foreground uppercase">Sessions</div>
-                <div className="text-base font-bold text-foreground">{workspaceData?.presentCount ?? 0}/{workspaceData?.totalSessionsCount ?? 0}</div>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5 text-center space-y-0.5">
-                <div className="text-[9px] font-bold text-muted-foreground uppercase">Rank</div>
-                <div className="text-base font-bold text-amber-400">#{workspaceData?.leaderboardRank ?? 1}</div>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5 text-center space-y-0.5">
-                <div className="text-[9px] font-bold text-muted-foreground uppercase">Renewals</div>
-                <div className="text-base font-bold text-foreground">{workspaceData?.membershipHistory?.length ?? 1}</div>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5 text-center space-y-0.5">
-                <div className="text-[9px] font-bold text-muted-foreground uppercase">Semester</div>
-                <div className="text-[11px] font-bold text-blue-400 truncate">{workspaceData?.activeSemesterName || "B1"}</div>
+            {/* 2. Sticky Tab Navigation */}
+            <div className="sticky top-[152px] z-10 bg-card/95 backdrop-blur-md border-b border-border px-5 pt-2">
+              <div className="flex border-b border-border/70 overflow-x-auto text-xs font-semibold scrollbar-none">
+                {(["timeline", "attendance", "tasks", "events", "points", "history", "profile", "achievements"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setWorkspaceTab(t)}
+                    className={`pb-2.5 px-3.5 capitalize whitespace-nowrap transition-colors border-b-2 ${
+                      workspaceTab === t ? "border-blue-500 text-blue-400 font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {t === "timeline" && "Timeline"}
+                    {t === "attendance" && `Attendance (${workspaceData?.attendance?.length ?? 0})`}
+                    {t === "tasks" && `Technical Tasks (${workspaceData?.tasks?.length ?? 0})`}
+                    {t === "events" && `Events (${workspaceData?.events?.length ?? 0})`}
+                    {t === "points" && "Points Ledger"}
+                    {t === "history" && "Membership History"}
+                    {t === "profile" && "Profile"}
+                    {t === "achievements" && "🏆 Achievements"}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* 3. Workspace Tab Navigation */}
-            <div className="flex border-b border-border/70 overflow-x-auto text-xs font-semibold">
-              {(["timeline", "attendance", "tasks", "events", "points", "history", "profile"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setWorkspaceTab(t)}
-                  className={`pb-2.5 px-3 capitalize whitespace-nowrap transition-colors border-b-2 ${
-                    workspaceTab === t ? "border-blue-500 text-blue-400 font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {t === "timeline" && "Chronological Timeline"}
-                  {t === "attendance" && `Attendance (${workspaceData?.attendance?.length ?? 0})`}
-                  {t === "tasks" && `Technical Tasks (${workspaceData?.tasks?.length ?? 0})`}
-                  {t === "events" && `Events (${workspaceData?.events?.length ?? 0})`}
-                  {t === "points" && "Points Ledger"}
-                  {t === "history" && "Membership History"}
-                  {t === "profile" && "Member Profile"}
-                </button>
-              ))}
-            </div>
+            {/* 3. Main Workspace Body Content */}
+            <div className="p-6 space-y-4 flex-1">
+              {isWorkspaceLoading ? (
+                <div className="py-12 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin text-primary" /> Loading member workspace intelligence...
+                </div>
+              ) : !workspaceData ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">Failed to load member intelligence data.</div>
+              ) : (
+                <div className="space-y-4">
+                  {/* ── TIMELINE TAB (Phase 3: Color-coded Feed) ───────────────────── */}
+                  {workspaceTab === "timeline" && (
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <History className="h-4 w-4 text-blue-400" /> Member Activity Feed (Newest First)
+                      </h3>
+                      {workspaceData.timeline.length === 0 ? (
+                        <div className="p-6 rounded-xl border border-border bg-muted/20 text-center text-xs text-muted-foreground">
+                          No activity records logged for this member yet.
+                        </div>
+                      ) : (
+                        <div className="relative pl-6 space-y-4 border-l border-border/60">
+                          {workspaceData.timeline.map((item: any) => (
+                            <div key={item.id} className="relative group">
+                              <div className={`absolute -left-[31px] top-1.5 h-4 w-4 rounded-full border-2 bg-card ${
+                                item.type === "attendance" ? "border-emerald-500 text-emerald-400" :
+                                item.type === "task" ? "border-blue-500 text-blue-400" :
+                                item.type === "event" ? "border-amber-500 text-amber-400" :
+                                item.type === "points" ? "border-purple-500 text-purple-400" : "border-slate-500 text-slate-400"
+                              }`} />
+                              
+                              <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm space-y-2 hover:border-blue-500/40 transition-colors">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex items-center gap-2">
+                                    <Badge
+                                      variant={
+                                        item.type === "attendance" ? "success" :
+                                        item.type === "task" ? "info" :
+                                        item.type === "event" ? "warning" : "secondary"
+                                      }
+                                      className="text-[10px] font-bold uppercase px-2 py-0.5"
+                                    >
+                                      ● {item.type}
+                                    </Badge>
+                                    <span className="font-bold text-xs text-foreground">{item.title}</span>
+                                  </div>
+                                  <span className="font-bold text-xs text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40">
+                                    {item.points}
+                                  </span>
+                                </div>
 
-            {/* 4. Tab Content */}
-            {isWorkspaceLoading ? (
-              <div className="py-12 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-                <RefreshCw className="h-4 w-4 animate-spin text-primary" /> Loading member workspace intelligence...
-              </div>
-            ) : !workspaceData ? (
-              <div className="py-8 text-center text-xs text-muted-foreground">Failed to load member intelligence data.</div>
-            ) : (
-              <div className="space-y-4">
-                {/* ── TIMELINE TAB ──────────────────────────────────────────────── */}
-                {workspaceTab === "timeline" && (
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <History className="h-4 w-4 text-blue-400" /> Chronological Member Activity Feed (Newest First)
-                    </h3>
-                    {workspaceData.timeline.length === 0 ? (
-                      <div className="p-6 rounded-xl border border-border bg-muted/20 text-center text-xs text-muted-foreground">
-                        No activity records logged for this member yet.
+                                <p className="text-[11px] text-muted-foreground">{item.details}</p>
+
+                                <div className="text-[10px] font-mono text-muted-foreground/70 border-t border-border/30 pt-1.5">
+                                  {new Date(item.date).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── ATTENDANCE TAB ────────────────────────────────────────────── */}
+                  {workspaceTab === "attendance" && (
+                    <div className="space-y-4">
+                      <div className="rounded-xl border border-border bg-muted/10 p-3 flex justify-between items-center text-xs flex-wrap gap-2">
+                        <span className="text-muted-foreground font-semibold">Attendance Overview</span>
+                        <div className="flex items-center gap-4">
+                          <span className="text-emerald-400 font-bold">Present: {workspaceData.presentCount}</span>
+                          <span className="text-amber-400 font-bold">Late: {workspaceData.lateCount}</span>
+                          <span className="text-red-400 font-bold">Absent: {workspaceData.absentCount}</span>
+                          <span className="text-blue-400 font-bold">Rate: {workspaceData.attendanceRate}%</span>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="relative pl-6 space-y-4 border-l border-border/60">
-                        {workspaceData.timeline.map((item: any) => (
-                          <div key={item.id} className="relative group">
-                            <div className={`absolute -left-[31px] top-0.5 h-4 w-4 rounded-full border-2 bg-card ${
-                              item.type === "attendance" ? "border-emerald-500" :
-                              item.type === "task" ? "border-blue-500" :
-                              item.type === "event" ? "border-amber-500" :
-                              item.type === "points" ? "border-purple-500" : "border-slate-500"
-                            }`} />
-                            <div className="rounded-xl border border-border/50 bg-card p-3.5 shadow-sm space-y-1">
-                              <div className="flex justify-between items-start">
-                                <span className="font-bold text-xs text-foreground">{item.title}</span>
-                                <span className="font-bold text-xs text-emerald-400">{item.points}</span>
-                              </div>
-                              <p className="text-[11px] text-muted-foreground">{item.details}</p>
-                              <div className="text-[10px] font-mono text-muted-foreground/60 pt-0.5">
-                                {new Date(item.date).toLocaleString("en-IN")}
-                              </div>
+
+                      <div className="overflow-x-auto rounded-xl border border-border">
+                        <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
+                          <thead className="border-b border-border bg-muted/40 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
+                            <tr>
+                              <th className="px-3 py-2.5">SESSION TITLE</th>
+                              <th className="px-3 py-2.5">DATE</th>
+                              <th className="px-3 py-2.5">STATUS</th>
+                              <th className="px-3 py-2.5">LATE</th>
+                              <th className="px-3 py-2.5">POINTS</th>
+                              <th className="px-3 py-2.5">METHOD</th>
+                              <th className="px-3 py-2.5">VOLUNTEER</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/40">
+                            {workspaceData.attendance.length === 0 ? (
+                              <tr><td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">No attendance records.</td></tr>
+                            ) : (
+                              workspaceData.attendance.map((a: any) => (
+                                <tr key={a.id} className="hover:bg-accent/30 transition-colors">
+                                  <td className="px-3 py-2.5 font-semibold">{a.sessionTitle}</td>
+                                  <td className="px-3 py-2.5 text-muted-foreground">{new Date(a.sessionDate).toLocaleDateString("en-IN")}</td>
+                                  <td className="px-3 py-2.5"><Badge variant="success" className="text-[10px]">{a.status}</Badge></td>
+                                  <td className="px-3 py-2.5"><Badge variant={a.late ? "destructive" : "outline"} className="text-[10px]">{a.late ? "Late" : "On Time"}</Badge></td>
+                                  <td className="px-3 py-2.5 font-bold text-emerald-400">+{a.points} Pts</td>
+                                  <td className="px-3 py-2.5 capitalize text-muted-foreground">{a.method}</td>
+                                  <td className="px-3 py-2.5 text-muted-foreground text-[11px]">{a.volunteerName}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── TECHNICAL TASKS TAB ───────────────────────────────────────── */}
+                  {workspaceTab === "tasks" && (
+                    <div className="space-y-4">
+                      <div className="overflow-x-auto rounded-xl border border-border">
+                        <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
+                          <thead className="border-b border-border bg-muted/40 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
+                            <tr>
+                              <th className="px-3 py-2.5">TASK TITLE</th>
+                              <th className="px-3 py-2.5">CATEGORY</th>
+                              <th className="px-3 py-2.5">POINTS</th>
+                              <th className="px-3 py-2.5">COMPLETION DATE</th>
+                              <th className="px-3 py-2.5">VERIFIER</th>
+                              <th className="px-3 py-2.5">STATUS</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/40">
+                            {workspaceData.tasks.length === 0 ? (
+                              <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No tasks completed yet.</td></tr>
+                            ) : (
+                              workspaceData.tasks.map((t: any) => (
+                                <tr key={t.id} className="hover:bg-accent/30 transition-colors">
+                                  <td className="px-3 py-2.5 font-semibold">{t.title}</td>
+                                  <td className="px-3 py-2.5"><Badge variant="outline" className="text-[10px]">{t.category}</Badge></td>
+                                  <td className="px-3 py-2.5 font-bold text-emerald-400">+{t.points} Pts</td>
+                                  <td className="px-3 py-2.5 text-muted-foreground">{new Date(t.completionDate).toLocaleString("en-IN")}</td>
+                                  <td className="px-3 py-2.5 text-muted-foreground text-[11px]">{t.verifierName}</td>
+                                  <td className="px-3 py-2.5"><Badge variant="success" className="text-[10px]">{t.status}</Badge></td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── EVENTS TAB ────────────────────────────────────────────────── */}
+                  {workspaceTab === "events" && (
+                    <div className="space-y-4">
+                      <div className="overflow-x-auto rounded-xl border border-border">
+                        <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
+                          <thead className="border-b border-border bg-muted/40 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
+                            <tr>
+                              <th className="px-3 py-2.5">EVENT NAME</th>
+                              <th className="px-3 py-2.5">VENUE</th>
+                              <th className="px-3 py-2.5">START DATE</th>
+                              <th className="px-3 py-2.5">PARTICIPATION</th>
+                              <th className="px-3 py-2.5">VERIFICATION</th>
+                              <th className="px-3 py-2.5">POINTS</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/40">
+                            {workspaceData.events.length === 0 ? (
+                              <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No event participations.</td></tr>
+                            ) : (
+                              workspaceData.events.map((e: any) => (
+                                <tr key={e.id} className="hover:bg-accent/30 transition-colors">
+                                  <td className="px-3 py-2.5 font-semibold">{e.eventName}</td>
+                                  <td className="px-3 py-2.5 text-muted-foreground">{e.venue}</td>
+                                  <td className="px-3 py-2.5 text-muted-foreground">{new Date(e.startDate).toLocaleDateString("en-IN")}</td>
+                                  <td className="px-3 py-2.5 text-muted-foreground">{e.participationStatus}</td>
+                                  <td className="px-3 py-2.5"><Badge variant={e.verificationStatus === "Verified" ? "success" : "secondary"} className="text-[10px]">{e.verificationStatus}</Badge></td>
+                                  <td className="px-3 py-2.5 font-bold text-emerald-400">+{e.points} Pts</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── POINTS LEDGER TAB ─────────────────────────────────────────── */}
+                  {workspaceTab === "points" && (
+                    <div className="space-y-4">
+                      <div className="overflow-x-auto rounded-xl border border-border">
+                        <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
+                          <thead className="border-b border-border bg-muted/40 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
+                            <tr>
+                              <th className="px-3 py-2.5">DATE</th>
+                              <th className="px-3 py-2.5">REASON</th>
+                              <th className="px-3 py-2.5">CATEGORY</th>
+                              <th className="px-3 py-2.5">POINTS</th>
+                              <th className="px-3 py-2.5">VERIFIER</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/40">
+                            {workspaceData.pointsLedger.length === 0 ? (
+                              <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">No ledger transactions logged.</td></tr>
+                            ) : (
+                              workspaceData.pointsLedger.map((l: any) => (
+                                <tr key={l.id} className="hover:bg-accent/30 transition-colors">
+                                  <td className="px-3 py-2.5 text-muted-foreground">{new Date(l.date).toLocaleString("en-IN")}</td>
+                                  <td className="px-3 py-2.5 font-medium">{l.remarks}</td>
+                                  <td className="px-3 py-2.5"><Badge variant="outline" className="text-[10px]">{l.category}</Badge></td>
+                                  <td className="px-3 py-2.5 font-bold text-emerald-400">{l.points >= 0 ? `+${l.points}` : l.points} Pts</td>
+                                  <td className="px-3 py-2.5 text-muted-foreground text-[11px]">{l.verifierName}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── MEMBERSHIP HISTORY TAB ────────────────────────────────────── */}
+                  {workspaceTab === "history" && (
+                    <div className="space-y-4">
+                      <div className="overflow-x-auto rounded-xl border border-border">
+                        <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
+                          <thead className="border-b border-border bg-muted/40 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
+                            <tr>
+                              <th className="px-3 py-2.5">SEMESTER</th>
+                              <th className="px-3 py-2.5">ACADEMIC YEAR</th>
+                              <th className="px-3 py-2.5">MEMBERSHIP ID</th>
+                              <th className="px-3 py-2.5">JOINED DATE</th>
+                              <th className="px-3 py-2.5">STATUS</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/40">
+                            {workspaceData.membershipHistory.map((m: any) => (
+                              <tr key={m.id} className="hover:bg-accent/30 transition-colors">
+                                <td className="px-3 py-2.5 font-bold text-foreground">{m.semesterName}</td>
+                                <td className="px-3 py-2.5 text-muted-foreground">{m.academicYearName}</td>
+                                <td className="px-3 py-2.5 font-mono text-[11px] text-blue-300">{m.membershipId}</td>
+                                <td className="px-3 py-2.5 text-muted-foreground">{new Date(m.joinDate).toLocaleDateString("en-IN")}</td>
+                                <td className="px-3 py-2.5"><Badge variant={m.status === "active" ? "success" : "secondary"} className="text-[10px]">{m.status}</Badge></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── MEMBER PROFILE TAB (Phase 4: Structured Information Card) ── */}
+                  {workspaceTab === "profile" && (
+                    <div className="space-y-6">
+                      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-6">
+                        <div className="border-b border-border pb-3">
+                          <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+                            <User className="h-5 w-5 text-blue-400" /> Member Official Information Profile
+                          </h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">Read-only master registry data for {activeWorkspaceMember.name}</p>
+                        </div>
+
+                        {/* Group 1: Personal Information */}
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/40 pb-1">
+                            1. Personal Information
+                          </h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs pt-1">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase text-muted-foreground block">Full Name</span>
+                              <span className="font-semibold text-foreground text-sm">{activeWorkspaceMember.name}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold uppercase text-muted-foreground block">Club Membership ID</span>
+                              <span className="font-mono text-blue-400 font-bold text-sm">{activeWorkspaceMember.clubMembershipId || activeWorkspaceMember.memberId || "RCMS026"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold uppercase text-muted-foreground block">System Member ID</span>
+                              <span className="font-mono text-slate-300 font-semibold">{activeWorkspaceMember.memberId || "MEM-2026-0000"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold uppercase text-muted-foreground block">Gender</span>
+                              <span className="capitalize text-foreground">{activeWorkspaceMember.gender || "Male"}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Group 2: Academic Information */}
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/40 pb-1">
+                            2. Academic Information
+                          </h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs pt-1">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase text-muted-foreground block">Roll Number</span>
+                              <span className="font-mono font-semibold text-foreground text-sm">{activeWorkspaceMember.rollNumber}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold uppercase text-muted-foreground block">Department / Branch</span>
+                              <span className="font-semibold text-foreground">{activeWorkspaceMember.branch || "ECE"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold uppercase text-muted-foreground block">Year of Study</span>
+                              <span className="font-semibold text-foreground">Yr {activeWorkspaceMember.year || 1}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Group 3: Contact Details */}
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/40 pb-1">
+                            3. Contact Details
+                          </h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs pt-1">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase text-muted-foreground block">Email Address</span>
+                              <span className="text-muted-foreground font-medium">{activeWorkspaceMember.email}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold uppercase text-muted-foreground block">Phone Number</span>
+                              <span className="text-muted-foreground font-medium">{activeWorkspaceMember.phone}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Group 4: Club Lifecycle Information */}
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/40 pb-1">
+                            4. Club Lifecycle Information
+                          </h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs pt-1">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase text-muted-foreground block">Current Semester</span>
+                              <span className="font-semibold text-blue-400">{workspaceData.activeSemesterName || "ROBOTICS_B1_2026"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold uppercase text-muted-foreground block">Joined Date</span>
+                              <span className="text-muted-foreground font-medium">
+                                {activeWorkspaceMember.createdAt ? new Date(activeWorkspaceMember.createdAt).toLocaleDateString("en-IN") : "01/08/2025"}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold uppercase text-muted-foreground block">Membership Status</span>
+                              <Badge variant={workspaceData.membershipStatus === "active" ? "success" : "secondary"} className="capitalize text-xs">
+                                {workspaceData.membershipStatus || "Active"}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── ACHIEVEMENTS TAB (Phase 2: UI Placeholder) ───────────────── */}
+                  {workspaceTab === "achievements" && (
+                    <div className="space-y-4">
+                      <div className="border-b border-border pb-3">
+                        <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+                          <Trophy className="h-5 w-5 text-amber-400" /> Robotics Club Badges & Achievements
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">Automated recognition framework for high-performing members</p>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {[
+                          { title: "First Attendance", desc: "Awarded upon completing 1st session scan", icon: "🏆" },
+                          { title: "First Task Completed", desc: "Awarded upon completing 1st technical assignment", icon: "🏆" },
+                          { title: "100 Points Club", desc: "Awarded upon crossing 100 total ledger points", icon: "🏆" },
+                          { title: "Perfect Attendance", desc: "Awarded for 100% attendance rate in a semester", icon: "🏆" },
+                          { title: "Robotics Volunteer", desc: "Awarded for volunteering in club operations", icon: "🏆" },
+                          { title: "Event Organizer", desc: "Awarded for co-organizing a major robotics event", icon: "🏆" },
+                          { title: "Semester Top Performer", desc: "Awarded to Rank #1 member at semester end", icon: "🏆" },
+                        ].map((badge, idx) => (
+                          <div key={idx} className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-3 relative opacity-85">
+                            <div className="flex justify-between items-start">
+                              <div className="text-3xl">{badge.icon}</div>
+                              <Badge variant="outline" className="text-[10px] font-bold text-amber-400 border-amber-800/60 bg-amber-950/20">
+                                Coming Soon
+                              </Badge>
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="font-bold text-sm text-foreground">{badge.title}</h4>
+                              <p className="text-xs text-muted-foreground">{badge.desc}</p>
                             </div>
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {/* ── ATTENDANCE TAB ────────────────────────────────────────────── */}
-                {workspaceTab === "attendance" && (
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-border bg-muted/10 p-3 flex justify-between items-center text-xs">
-                      <span className="text-muted-foreground font-semibold">Attendance Overview</span>
-                      <div className="flex items-center gap-4">
-                        <span className="text-emerald-400 font-bold">Present: {workspaceData.presentCount}</span>
-                        <span className="text-amber-400 font-bold">Late: {workspaceData.lateCount}</span>
-                        <span className="text-red-400 font-bold">Absent: {workspaceData.absentCount}</span>
-                        <span className="text-blue-400 font-bold">Rate: {workspaceData.attendanceRate}%</span>
-                      </div>
                     </div>
-
-                    <div className="overflow-x-auto rounded-xl border border-border">
-                      <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
-                        <thead className="border-b border-border bg-muted/40 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
-                          <tr>
-                            <th className="px-3 py-2.5">SESSION TITLE</th>
-                            <th className="px-3 py-2.5">DATE</th>
-                            <th className="px-3 py-2.5">STATUS</th>
-                            <th className="px-3 py-2.5">LATE</th>
-                            <th className="px-3 py-2.5">POINTS</th>
-                            <th className="px-3 py-2.5">METHOD</th>
-                            <th className="px-3 py-2.5">VOLUNTEER</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/40">
-                          {workspaceData.attendance.length === 0 ? (
-                            <tr><td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">No attendance records.</td></tr>
-                          ) : (
-                            workspaceData.attendance.map((a: any) => (
-                              <tr key={a.id} className="hover:bg-accent/30 transition-colors">
-                                <td className="px-3 py-2.5 font-semibold">{a.sessionTitle}</td>
-                                <td className="px-3 py-2.5 text-muted-foreground">{new Date(a.sessionDate).toLocaleDateString("en-IN")}</td>
-                                <td className="px-3 py-2.5"><Badge variant="success" className="text-[10px]">{a.status}</Badge></td>
-                                <td className="px-3 py-2.5"><Badge variant={a.late ? "destructive" : "outline"} className="text-[10px]">{a.late ? "Late" : "On Time"}</Badge></td>
-                                <td className="px-3 py-2.5 font-bold text-emerald-400">+{a.points} Pts</td>
-                                <td className="px-3 py-2.5 capitalize text-muted-foreground">{a.method}</td>
-                                <td className="px-3 py-2.5 text-muted-foreground text-[11px]">{a.volunteerName}</td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── TECHNICAL TASKS TAB ───────────────────────────────────────── */}
-                {workspaceTab === "tasks" && (
-                  <div className="space-y-4">
-                    <div className="overflow-x-auto rounded-xl border border-border">
-                      <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
-                        <thead className="border-b border-border bg-muted/40 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
-                          <tr>
-                            <th className="px-3 py-2.5">TASK TITLE</th>
-                            <th className="px-3 py-2.5">CATEGORY</th>
-                            <th className="px-3 py-2.5">POINTS</th>
-                            <th className="px-3 py-2.5">COMPLETION DATE</th>
-                            <th className="px-3 py-2.5">VERIFIER</th>
-                            <th className="px-3 py-2.5">STATUS</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/40">
-                          {workspaceData.tasks.length === 0 ? (
-                            <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No tasks completed yet.</td></tr>
-                          ) : (
-                            workspaceData.tasks.map((t: any) => (
-                              <tr key={t.id} className="hover:bg-accent/30 transition-colors">
-                                <td className="px-3 py-2.5 font-semibold">{t.title}</td>
-                                <td className="px-3 py-2.5"><Badge variant="outline" className="text-[10px]">{t.category}</Badge></td>
-                                <td className="px-3 py-2.5 font-bold text-emerald-400">+{t.points} Pts</td>
-                                <td className="px-3 py-2.5 text-muted-foreground">{new Date(t.completionDate).toLocaleString("en-IN")}</td>
-                                <td className="px-3 py-2.5 text-muted-foreground text-[11px]">{t.verifierName}</td>
-                                <td className="px-3 py-2.5"><Badge variant="success" className="text-[10px]">{t.status}</Badge></td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── EVENTS TAB ────────────────────────────────────────────────── */}
-                {workspaceTab === "events" && (
-                  <div className="space-y-4">
-                    <div className="overflow-x-auto rounded-xl border border-border">
-                      <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
-                        <thead className="border-b border-border bg-muted/40 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
-                          <tr>
-                            <th className="px-3 py-2.5">EVENT NAME</th>
-                            <th className="px-3 py-2.5">VENUE</th>
-                            <th className="px-3 py-2.5">START DATE</th>
-                            <th className="px-3 py-2.5">PARTICIPATION</th>
-                            <th className="px-3 py-2.5">VERIFICATION</th>
-                            <th className="px-3 py-2.5">POINTS</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/40">
-                          {workspaceData.events.length === 0 ? (
-                            <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No event participations.</td></tr>
-                          ) : (
-                            workspaceData.events.map((e: any) => (
-                              <tr key={e.id} className="hover:bg-accent/30 transition-colors">
-                                <td className="px-3 py-2.5 font-semibold">{e.eventName}</td>
-                                <td className="px-3 py-2.5 text-muted-foreground">{e.venue}</td>
-                                <td className="px-3 py-2.5 text-muted-foreground">{new Date(e.startDate).toLocaleDateString("en-IN")}</td>
-                                <td className="px-3 py-2.5 text-muted-foreground">{e.participationStatus}</td>
-                                <td className="px-3 py-2.5"><Badge variant={e.verificationStatus === "Verified" ? "success" : "secondary"} className="text-[10px]">{e.verificationStatus}</Badge></td>
-                                <td className="px-3 py-2.5 font-bold text-emerald-400">+{e.points} Pts</td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── POINTS LEDGER TAB ─────────────────────────────────────────── */}
-                {workspaceTab === "points" && (
-                  <div className="space-y-4">
-                    <div className="overflow-x-auto rounded-xl border border-border">
-                      <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
-                        <thead className="border-b border-border bg-muted/40 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
-                          <tr>
-                            <th className="px-3 py-2.5">DATE</th>
-                            <th className="px-3 py-2.5">REASON</th>
-                            <th className="px-3 py-2.5">CATEGORY</th>
-                            <th className="px-3 py-2.5">POINTS</th>
-                            <th className="px-3 py-2.5">VERIFIER</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/40">
-                          {workspaceData.pointsLedger.length === 0 ? (
-                            <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">No ledger transactions logged.</td></tr>
-                          ) : (
-                            workspaceData.pointsLedger.map((l: any) => (
-                              <tr key={l.id} className="hover:bg-accent/30 transition-colors">
-                                <td className="px-3 py-2.5 text-muted-foreground">{new Date(l.date).toLocaleString("en-IN")}</td>
-                                <td className="px-3 py-2.5 font-medium">{l.remarks}</td>
-                                <td className="px-3 py-2.5"><Badge variant="outline" className="text-[10px]">{l.category}</Badge></td>
-                                <td className="px-3 py-2.5 font-bold text-emerald-400">{l.points >= 0 ? `+${l.points}` : l.points} Pts</td>
-                                <td className="px-3 py-2.5 text-muted-foreground text-[11px]">{l.verifierName}</td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── MEMBERSHIP HISTORY TAB ────────────────────────────────────── */}
-                {workspaceTab === "history" && (
-                  <div className="space-y-4">
-                    <div className="overflow-x-auto rounded-xl border border-border">
-                      <table className="w-full text-left text-xs text-foreground whitespace-nowrap">
-                        <thead className="border-b border-border bg-muted/40 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
-                          <tr>
-                            <th className="px-3 py-2.5">SEMESTER</th>
-                            <th className="px-3 py-2.5">ACADEMIC YEAR</th>
-                            <th className="px-3 py-2.5">MEMBERSHIP ID</th>
-                            <th className="px-3 py-2.5">JOINED DATE</th>
-                            <th className="px-3 py-2.5">STATUS</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/40">
-                          {workspaceData.membershipHistory.map((m: any) => (
-                            <tr key={m.id} className="hover:bg-accent/30 transition-colors">
-                              <td className="px-3 py-2.5 font-bold text-foreground">{m.semesterName}</td>
-                              <td className="px-3 py-2.5 text-muted-foreground">{m.academicYearName}</td>
-                              <td className="px-3 py-2.5 font-mono text-[11px] text-blue-300">{m.membershipId}</td>
-                              <td className="px-3 py-2.5 text-muted-foreground">{new Date(m.joinDate).toLocaleDateString("en-IN")}</td>
-                              <td className="px-3 py-2.5"><Badge variant={m.status === "active" ? "success" : "secondary"} className="text-[10px]">{m.status}</Badge></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── MEMBER PROFILE TAB ────────────────────────────────────────── */}
-                {workspaceTab === "profile" && (
-                  <div className="rounded-xl border border-border bg-muted/10 p-5 space-y-4 text-xs">
-                    <h3 className="font-bold text-sm text-foreground flex items-center gap-1.5">
-                      <User className="h-4 w-4 text-blue-400" /> Member Personal Profile Details
-                    </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      <div>
-                        <span className="text-[10px] font-bold uppercase text-muted-foreground block">Full Name</span>
-                        <span className="font-semibold text-foreground">{activeWorkspaceMember.name}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase text-muted-foreground block">Club Membership ID</span>
-                        <span className="font-mono text-blue-300 font-semibold">{activeWorkspaceMember.clubMembershipId || activeWorkspaceMember.memberId || "SAC-RC-0000"}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase text-muted-foreground block">System Member ID</span>
-                        <span className="font-mono text-slate-300">{activeWorkspaceMember.memberId || "MEM-2026-0000"}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase text-muted-foreground block">Roll Number</span>
-                        <span className="font-mono text-foreground">{activeWorkspaceMember.rollNumber}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase text-muted-foreground block">Department / Branch</span>
-                        <span className="font-semibold">{activeWorkspaceMember.branch || "ECE"}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase text-muted-foreground block">Year of Study</span>
-                        <span>Yr {activeWorkspaceMember.year || 1}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase text-muted-foreground block">Email Address</span>
-                        <span className="text-muted-foreground">{activeWorkspaceMember.email}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase text-muted-foreground block">Phone Number</span>
-                        <span className="text-muted-foreground">{activeWorkspaceMember.phone}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase text-muted-foreground block">Gender</span>
-                        <span className="capitalize">{activeWorkspaceMember.gender || "Other"}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
