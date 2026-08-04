@@ -55,13 +55,30 @@ BEGIN
   END LOOP;
 END $$;
 
--- Re-insert default system super_admin user so authentication and system actions continue working
-INSERT INTO public.users (id, name, email, role, created_at, updated_at)
+-- Re-insert default system role
+INSERT INTO public.roles (id, name, description, created_by, updated_by, created_at, updated_at)
+VALUES (
+  '00000000-0000-0000-0000-000000000001',
+  'super_admin',
+  'Super Administrator with full system permissions',
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000001',
+  NOW(),
+  NOW()
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Re-insert default system user so foreign key dependencies remain valid
+INSERT INTO public.users (id, name, email, password_hash, role_id, status, created_by, updated_by, created_at, updated_at)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
   'RCMS System Admin',
   'admin@rcms.robotics.org',
-  'super_admin',
+  'HASH_SYSTEM_ADMIN',
+  '00000000-0000-0000-0000-000000000001',
+  'active',
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000001',
   NOW(),
   NOW()
 )

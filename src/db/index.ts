@@ -18,7 +18,11 @@ const supabaseKey =
 
 const client = postgres(connectionString, { prepare: false, ssl: "require" });
 export const drizzleDb = drizzle(client, { schema });
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  global: {
+    fetch: (url: RequestInfo | URL, init?: RequestInit) => fetch(url, { ...init, cache: "no-store" }),
+  },
+});
 
 export const isServerless = Boolean(
   process.env.VERCEL ||

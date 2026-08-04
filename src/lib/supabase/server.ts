@@ -20,6 +20,9 @@ export function createClient() {
     url,
     key,
     {
+      global: {
+        fetch: (url: RequestInfo | URL, init?: RequestInit) => fetch(url, { ...init, cache: "no-store" }),
+      },
       cookies: {
         get(name: string) {
           return cookieStore.get(name)?.value;
