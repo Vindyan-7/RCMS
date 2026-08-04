@@ -15,6 +15,7 @@ import {
   Settings,
   Bot,
   GraduationCap,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,10 +26,11 @@ const navigationItems = [
   { name: "Attendance", href: "/dashboard/attendance", icon: CalendarCheck },
   { name: "Operations", href: "/dashboard/operations", icon: CheckSquare },
   { name: "Points Engine", href: "/dashboard/points", icon: Award },
-  { name: "Communication", href: "/dashboard/communication", icon: Bell },
-  { name: "Inventory", href: "/dashboard/inventory", icon: Box },
-  { name: "Finance", href: "/dashboard/finance", icon: DollarSign },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+  { name: "Finance", href: "/dashboard/finance", icon: DollarSign },
+  { name: "Inventory", href: "/dashboard/inventory", icon: Box },
+  { name: "Communication", href: "/dashboard/communication", icon: Bell },
+  { name: "Team Studio", href: "/dashboard/team-studio", icon: Sparkles },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 

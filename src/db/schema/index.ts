@@ -55,3 +55,8 @@ export * from "./sponsorship_agreements";
 export * from "./budgets";
 export * from "./expenses";
 export * from "./financial_transactions";
+
+// Team Studio Domain Schemas
+export * from "./team_generations";
+export * from "./team_members";
+export * from "./member_collaborations";
