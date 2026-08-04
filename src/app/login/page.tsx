@@ -15,10 +15,12 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
+    document.cookie = "rcms_admin_session=authenticated; path=/; max-age=86400; SameSite=Lax";
+
     setTimeout(() => {
       setLoading(false);
       router.push("/dashboard");
-    }, 600);
+    }, 400);
   };
 
   return (

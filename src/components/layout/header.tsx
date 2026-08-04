@@ -45,7 +45,8 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
-    router.push("/login");
+    document.cookie = "rcms_admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    router.push("/");
   };
 
   return (
