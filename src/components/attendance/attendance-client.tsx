@@ -69,7 +69,7 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
   const [isPending, startTransition] = useTransition();
 
   const refreshSessionsAndRecords = useCallback(async () => {
-    startTransition(async () => {
+    try {
       const [sessRes, recsRes, metaRes, membersRes] = await Promise.all([
         getAttendanceSessionsAction(),
         getAttendanceRecordsAction(),
@@ -80,7 +80,7 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
       if (recsRes.success && recsRes.data) setRecords(recsRes.data.items);
       if (metaRes.success && metaRes.data) setSemesterContext(metaRes.data);
       if (membersRes.success && membersRes.data) setEnrolledMembers(membersRes.data);
-    });
+    } catch {}
   }, []);
 
   // Phase 1: Auto-fetch fresh data when page is opened / mounted

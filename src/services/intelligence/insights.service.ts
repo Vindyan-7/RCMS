@@ -2,7 +2,7 @@
  * Intelligence Layer - Automated Insights Engine Implementation
  */
 
-import { db, supabase } from "@/db";
+import { db, supabase, isServerless } from "@/db";
 import { inventoryItems, inventoryBorrowings, members } from "@/db/schema";
 import { eq, isNull } from "drizzle-orm";
 import { logger } from "@/core/logger";
@@ -21,6 +21,40 @@ export class InsightsService {
     logger.info("[InsightsService] Evaluating system-wide automated operational insights");
 
     const insights: SystemInsightItem[] = [];
+
+    if (isServerless) {
+      try {
+        const [invRes, memRes] = await Promise.all([
+          supabase.from("inventory_items").select("id, name, available, quantity").is("deleted_at", null),
+          supabase.from("members").select("id").eq("status", "inactive"),
+        ]);
+
+        if (invRes.data) {
+          invRes.data.forEach((item: any) => {
+            if (item.available === 0) {
+              insights.push({
+                id: `inv-out-${item.id}`,
+                type: "warning",
+                title: `Stock Depleted: ${item.name}`,
+                description: `All ${item.quantity} units are currently issued out or unavailable.`,
+              });
+            }
+          });
+        }
+
+        if (memRes.data && memRes.data.length > 0) {
+          insights.push({
+            id: "mem-inactive-info",
+            type: "info",
+            title: `${memRes.data.length} Inactive Member Records`,
+            description: "Member records marked inactive; term renewal may be required.",
+          });
+        }
+      } catch (restErr) {
+        logger.error("[InsightsService] REST query error", restErr);
+      }
+      return insights;
+    }
 
     try {
       // 1. Low stock inventory warnings
@@ -71,37 +105,6 @@ export class InsightsService {
       }
     } catch (err) {
       logger.error("[InsightsService] Drizzle query error, falling back to Supabase REST API", err);
-
-      try {
-        const [invRes, memRes] = await Promise.all([
-          supabase.from("inventory_items").select("id, name, available, quantity").is("deleted_at", null),
-          supabase.from("members").select("id").eq("status", "inactive"),
-        ]);
-
-        if (invRes.data) {
-          invRes.data.forEach((item: any) => {
-            if (item.available === 0) {
-              insights.push({
-                id: `inv-out-${item.id}`,
-                type: "warning",
-                title: `Stock Depleted: ${item.name}`,
-                description: `All ${item.quantity} units are currently issued out or unavailable.`,
-              });
-            }
-          });
-        }
-
-        if (memRes.data && memRes.data.length > 0) {
-          insights.push({
-            id: "mem-inactive-info",
-            type: "info",
-            title: `${memRes.data.length} Inactive Member Records`,
-            description: "Member records marked inactive; term renewal may be required.",
-          });
-        }
-      } catch (restErr) {
-        logger.error("[InsightsService] REST fallback error", restErr);
-      }
     }
 
     return insights;
