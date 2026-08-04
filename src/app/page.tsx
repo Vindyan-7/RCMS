@@ -22,11 +22,11 @@ export default async function PublicHomePage() {
             <div className="text-center space-y-6 max-w-3xl mx-auto">
               <div className="inline-flex items-center space-x-2 rounded-full bg-blue-50 border border-blue-200 px-3.5 py-1 text-xs font-semibold text-blue-700">
                 <Zap className="h-3.5 w-3.5 text-blue-600" />
-                <span>SAC Student Activity Center</span>
+                <span>Student Activity Council</span>
               </div>
 
               <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-                SAC Robotics Club <br />
+                Robotics Club <br />
                 <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                   Innovation & Engineering Platform
                 </span>
@@ -76,7 +76,7 @@ export default async function PublicHomePage() {
               </div>
               <div className="space-y-1">
                 <p className="text-3xl font-extrabold text-amber-400">SAC</p>
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Student Activity Center</p>
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Student Activity Council</p>
               </div>
             </div>
           </div>

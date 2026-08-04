@@ -90,13 +90,12 @@ export function PublicLeaderboardClient({ initialLeaderboard }: PublicLeaderboar
                 <th className="py-3.5 px-4 text-center">Tasks Completed</th>
                 <th className="py-3.5 px-4 text-center">Attendance %</th>
                 <th className="py-3.5 px-4 text-right">Semester Points</th>
-                <th className="py-3.5 px-4 text-center">Badge Tier</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-800">
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
                     No members match your criteria.
                   </td>
                 </tr>
@@ -130,12 +129,6 @@ export function PublicLeaderboardClient({ initialLeaderboard }: PublicLeaderboar
                     </td>
                     <td className="py-3.5 px-4 text-right font-bold text-blue-600 text-sm">
                       {item.totalPoints} Pts
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <span className={`inline-flex items-center space-x-1 rounded-full px-2.5 py-0.5 text-[10px] ${getBadgeTierStyle(item.badgeTier)}`}>
-                        <Award className="h-3 w-3" />
-                        <span>{item.badgeTier}</span>
-                      </span>
                     </td>
                   </tr>
                 ))
@@ -181,14 +174,6 @@ export function PublicLeaderboardClient({ initialLeaderboard }: PublicLeaderboar
                     <span className="text-slate-400 block text-[10px]">Attendance</span>
                     <span className="font-semibold text-slate-700">{item.attendanceRate}%</span>
                   </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <span className={`inline-flex items-center space-x-1 rounded-full px-2.5 py-0.5 text-[10px] ${getBadgeTierStyle(item.badgeTier)}`}>
-                    <Award className="h-3 w-3" />
-                    <span>{item.badgeTier}</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400 italic">Robotics Club Contributor</span>
                 </div>
               </div>
             ))

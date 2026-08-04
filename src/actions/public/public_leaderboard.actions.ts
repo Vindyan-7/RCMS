@@ -1,6 +1,6 @@
 /**
  * Public Domain - Public Leaderboard Action
- * Strictly exposes non-sensitive member leaderboard metrics for the public portal.
+ * Strictly exposes non-sensitive member leaderboard metrics for active semester enrolled members.
  */
 
 import { supabase, isServerless, toCamelCase } from "@/db";
@@ -14,7 +14,6 @@ export interface PublicLeaderboardItem {
   totalPoints: number;
   attendanceRate: number; // e.g. 85 (%)
   tasksCompleted: number; // count
-  badgeTier: "Gold Vanguard" | "Silver Contributor" | "Bronze Member" | "Member";
 }
 
 function deriveBranch(rollNumber: string | null, rawBranch: string | null): string {
@@ -34,64 +33,106 @@ function deriveBranch(rollNumber: string | null, rawBranch: string | null): stri
   return "ECE";
 }
 
-function deriveBadgeTier(points: number): "Gold Vanguard" | "Silver Contributor" | "Bronze Member" | "Member" {
-  if (points >= 200) return "Gold Vanguard";
-  if (points >= 100) return "Silver Contributor";
-  if (points >= 50) return "Bronze Member";
-  return "Member";
-}
-
 export async function getPublicLeaderboardAction(): Promise<{
   success: boolean;
   data?: PublicLeaderboardItem[];
   error?: string;
 }> {
-  logger.info("[PublicAction: getPublicLeaderboardAction] Fetching public leaderboard rankings");
+  logger.info("[PublicAction: getPublicLeaderboardAction] Fetching public leaderboard rankings for active semester");
 
   try {
-    // 1. Fetch active members
-    const { data: membersData, error: memErr } = await supabase
-      .from("members")
-      .select("id, name, member_id, club_membership_id, roll_number, branch")
+    // 1. Get active semester
+    const { data: semData } = await supabase
+      .from("semesters")
+      .select("id")
       .eq("status", "active")
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .limit(1);
 
-    if (memErr || !membersData) {
-      logger.error("[PublicAction] Failed to load members", memErr);
-      return { success: false, error: "Failed to load public leaderboard" };
+    const activeSemesterId = semData && semData[0] ? semData[0].id : null;
+
+    // 2. Fetch enrolled members for active semester (or fallback to active members)
+    let enrolledMembers: any[] = [];
+    if (activeSemesterId) {
+      const { data: memsData } = await supabase
+        .from("memberships")
+        .select("member_id, members(id, name, member_id, club_membership_id, roll_number, branch, status)")
+        .eq("semester_id", activeSemesterId)
+        .eq("status", "active")
+        .is("deleted_at", null);
+
+      if (memsData && memsData.length > 0) {
+        enrolledMembers = memsData
+          .filter((m: any) => m.members && m.members.status === "active")
+          .map((m: any) => m.members);
+      }
     }
 
-    // 2. Fetch points ledger entries
+    // Fallback if no active semester memberships found
+    if (enrolledMembers.length === 0) {
+      const { data: allMems } = await supabase
+        .from("members")
+        .select("id, name, member_id, club_membership_id, roll_number, branch")
+        .eq("status", "active")
+        .is("deleted_at", null);
+      enrolledMembers = allMems || [];
+    }
+
+    // 3. Fetch points ledger entries for total points
     const { data: pointsData } = await supabase
       .from("points_ledger")
-      .select("member_id, points, is_revoked");
+      .select("member_id, points, is_revoked, semester_id");
 
     const pointsMap: Record<string, number> = {};
     if (pointsData) {
       for (const entry of pointsData) {
         if (entry.is_revoked) continue;
+        if (activeSemesterId && entry.semester_id && entry.semester_id !== activeSemesterId) continue;
         const mId = entry.member_id;
         pointsMap[mId] = (pointsMap[mId] || 0) + (Number(entry.points) || 0);
       }
     }
 
-    // 3. Fetch attendance records for attendance rate calculation
-    const [recsRes, sessRes] = await Promise.all([
-      supabase.from("attendance_records").select("member_id, status"),
-      supabase.from("attendance_sessions").select("id").is("deleted_at", null),
-    ]);
+    // 4. Fetch attendance sessions & records for attendance rate calculation
+    let sessionCount = 0;
+    let recsData: any[] = [];
 
-    const totalSessionsCount = sessRes.data?.length || 1;
-    const presentMap: Record<string, number> = {};
-    if (recsRes.data) {
-      for (const rec of recsRes.data) {
-        if (rec.status === "present" || rec.status === "late") {
-          presentMap[rec.member_id] = (presentMap[rec.member_id] || 0) + 1;
-        }
+    if (activeSemesterId) {
+      const { data: sessData } = await supabase
+        .from("attendance_sessions")
+        .select("id")
+        .eq("semester_id", activeSemesterId)
+        .is("deleted_at", null);
+
+      sessionCount = sessData?.length || 0;
+      const sessionIds = (sessData || []).map((s: any) => s.id);
+
+      if (sessionIds.length > 0) {
+        const { data: recs } = await supabase
+          .from("attendance_records")
+          .select("member_id, status")
+          .in("session_id", sessionIds);
+        recsData = recs || [];
       }
     }
 
-    // 4. Fetch completed tasks count
+    if (recsData.length === 0) {
+      const [sessRes, recsRes] = await Promise.all([
+        supabase.from("attendance_sessions").select("id").is("deleted_at", null),
+        supabase.from("attendance_records").select("member_id, status"),
+      ]);
+      sessionCount = sessRes.data?.length || 0;
+      recsData = recsRes.data || [];
+    }
+
+    const presentMap: Record<string, number> = {};
+    for (const rec of recsData) {
+      if (rec.status === "present" || rec.status === "late") {
+        presentMap[rec.member_id] = (presentMap[rec.member_id] || 0) + 1;
+      }
+    }
+
+    // 5. Fetch task completions
     const { data: completionsData } = await supabase
       .from("task_completions")
       .select("member_id, is_revoked");
@@ -104,15 +145,21 @@ export async function getPublicLeaderboardAction(): Promise<{
       }
     }
 
-    // 5. Construct public leaderboard items without sensitive data
-    const rawItems: Array<Omit<PublicLeaderboardItem, "rank">> = membersData.map((m: any) => {
+    // 6. Map to public leaderboard items (Strictly no email, phone, or UUIDs)
+    const rawItems: Array<Omit<PublicLeaderboardItem, "rank">> = enrolledMembers.map((m: any) => {
       const memberIdStr = m.member_id || m.club_membership_id || "SAC-RC-000";
       const totalPoints = pointsMap[m.id] || 0;
       const presentCount = presentMap[m.id] || 0;
-      const attendanceRate = Math.min(100, Math.round((presentCount / Math.max(1, totalSessionsCount)) * 100));
+      
+      let attendanceRate = 0;
+      if (sessionCount > 0) {
+        attendanceRate = Math.min(100, Math.round((presentCount / sessionCount) * 100));
+      } else if (presentCount > 0) {
+        attendanceRate = 100;
+      }
+
       const tasksCompleted = taskMap[m.id] || 0;
       const branch = deriveBranch(m.roll_number, m.branch);
-      const badgeTier = deriveBadgeTier(totalPoints);
 
       return {
         memberName: m.name || "Anonymous Member",
@@ -121,7 +168,6 @@ export async function getPublicLeaderboardAction(): Promise<{
         totalPoints,
         attendanceRate,
         tasksCompleted,
-        badgeTier,
       };
     });
 

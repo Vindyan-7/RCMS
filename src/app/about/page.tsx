@@ -13,11 +13,11 @@ export default function AboutPage() {
           <div className="text-center space-y-4 max-w-3xl mx-auto">
             <div className="inline-flex items-center space-x-2 rounded-full bg-blue-50 border border-blue-200 px-3.5 py-1 text-xs font-semibold text-blue-700">
               <Bot className="h-3.5 w-3.5 text-blue-600" />
-              <span>SAC Student Activity Center</span>
+              <span>Student Activity Council</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
-              About SAC Robotics Club
+              About Robotics Club
             </h1>
 
             <p className="text-sm sm:text-base text-slate-600 leading-relaxed">

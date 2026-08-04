@@ -35,12 +35,7 @@ export default async function PublicLeaderboardPage() {
             <div className="flex flex-wrap items-center gap-3 pt-2 text-xs text-slate-600 border-t border-slate-100">
               <span className="flex items-center space-x-1.5 font-medium">
                 <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                <span>Authoritative Point Ledger</span>
-              </span>
-              <span className="text-slate-300">•</span>
-              <span className="flex items-center space-x-1.5 font-medium">
-                <Award className="h-4 w-4 text-blue-600" />
-                <span>Tier Achievements (Gold / Silver / Bronze)</span>
+                <span>Active Semester Authoritative Rankings</span>
               </span>
             </div>
           </div>

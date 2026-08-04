@@ -25,9 +25,6 @@ export function PublicHeader() {
             <span className="text-lg font-bold tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
               Robotics Club
             </span>
-            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
-              SAC Portal
-            </span>
           </div>
         </Link>
 

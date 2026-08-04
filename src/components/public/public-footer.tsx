@@ -13,11 +13,11 @@ export function PublicFooter() {
                 <Bot className="h-5 w-5" />
               </div>
               <span className="text-base font-bold text-slate-900">
-                SAC Robotics Club
+                Robotics Club
               </span>
             </div>
             <p className="text-xs text-slate-500 max-w-md leading-relaxed">
-              Student Activity Center (SAC) Robotics Club platform. Empowering students in hardware engineering, embedded systems, autonomous robotics, and AI/ML competitions.
+              Student Activity Council (SAC) Robotics Club platform. Empowering students in hardware engineering, embedded systems, autonomous robotics, and AI/ML competitions.
             </p>
           </div>
 
