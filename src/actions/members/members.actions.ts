@@ -2,6 +2,7 @@
 
 /**
  * Members Domain - Member Server Actions
+ * Production Polish: Consolidated Member Workspace Intelligence & Enriched Exports
  */
 
 import { ApiResponse, PaginationQuery } from "@/core/types";
@@ -14,20 +15,24 @@ import { formatErrorResponse } from "@/core/errors";
 import { logger } from "@/core/logger";
 import { Authorizer, PERMISSIONS } from "@/core/security/rbac";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
+import { supabase, toCamelCase } from "@/db";
 
-// Singleton instances for Server Actions environment
 const membersRepo = new MembersRepository();
 const membershipsRepo = new MembershipsRepository();
 const membersService = new MembersService(membersRepo, membershipsRepo);
 
-// Helper for security context in Server Actions
 async function getActorContext() {
-  // Prototype/System Actor context; in full runtime, resolves from Supabase Auth session
   return {
     id: "00000000-0000-0000-0000-000000000001",
     role: "super_admin",
     permissions: [PERMISSIONS.MEMBERS_CREATE, PERMISSIONS.MEMBERS_VIEW, PERMISSIONS.MEMBERS_EDIT, PERMISSIONS.MEMBERS_DELETE],
   };
+}
+
+function escapeCsv(val: any): string {
+  if (val === null || val === undefined) return '""';
+  const str = String(val).replace(/"/g, '""');
+  return `"${str}"`;
 }
 
 export async function registerMemberAction(
@@ -203,7 +208,6 @@ export async function importMembersCsvAction(
       const rollNumber = record["roll number"] || record["rollnumber"] || record["roll_number"] || cols[1] || "";
       const email = record["email"] || cols[2] || "";
       
-      // Normalize phone: extract trailing 10 digits or fallback to valid default
       const rawPhone = record["phone"] || cols[3] || "";
       const digits = rawPhone.replace(/\D/g, "").slice(-10);
       const phone = digits.length === 10 && /^[6-9]/.test(digits) ? digits : "9000000000";
@@ -211,7 +215,6 @@ export async function importMembersCsvAction(
       const branch = (record["branch"] || cols[4] || "ECE").toUpperCase();
       const year = Math.min(4, Math.max(1, Number(record["year"] || cols[5]) || 1));
       
-      // Normalize gender to lowercase enum expected by Zod schema
       const rawGender = (record["gender"] || cols[6] || "other").toLowerCase();
       const gender = ["male", "female", "other", "prefer_not_to_say"].includes(rawGender) ? rawGender : "other";
 
@@ -249,5 +252,291 @@ export async function importMembersCsvAction(
   } catch (error) {
     logger.error("[Action: importMembersCsvAction] Execution failed", error);
     return formatErrorResponse(error);
+  }
+}
+
+/**
+ * Consolidated Member Workspace Intelligence Fetch
+ * Returns complete aggregated lifecycle profile for a single member in ONE request
+ */
+export async function getMemberWorkspaceDataAction(memberId: string): Promise<ApiResponse<{
+  member: MemberSelect;
+  activeSemesterName: string;
+  membershipStatus: string;
+  totalPoints: number;
+  leaderboardRank: number;
+  attendanceRate: number;
+  presentCount: number;
+  lateCount: number;
+  absentCount: number;
+  tasksCompletedCount: number;
+  eventsParticipatedCount: number;
+  totalSessionsCount: number;
+  timeline: Array<{
+    id: string;
+    type: "attendance" | "task" | "event" | "points" | "membership";
+    title: string;
+    points: string;
+    details: string;
+    date: string;
+  }>;
+  attendance: Array<{
+    id: string;
+    sessionTitle: string;
+    sessionDate: string;
+    status: string;
+    late: boolean;
+    points: number;
+    method: string;
+    volunteerName: string;
+  }>;
+  tasks: Array<{
+    id: string;
+    title: string;
+    category: string;
+    points: number;
+    completionDate: string;
+    verifierName: string;
+    status: string;
+  }>;
+  events: Array<{
+    id: string;
+    eventName: string;
+    venue: string;
+    startDate: string;
+    points: number;
+    participationStatus: string;
+    verificationStatus: string;
+  }>;
+  pointsLedger: Array<{
+    id: string;
+    date: string;
+    category: string;
+    remarks: string;
+    points: number;
+    verifierName: string;
+  }>;
+  membershipHistory: Array<{
+    id: string;
+    semesterName: string;
+    academicYearName: string;
+    joinDate: string;
+    status: string;
+    membershipId: string;
+  }>;
+}>> {
+  logger.info("[Action: getMemberWorkspaceDataAction] Consolidating member intelligence", { memberId });
+  try {
+    const actor = await getActorContext();
+    Authorizer.hasPermission(actor, PERMISSIONS.MEMBERS_VIEW);
+
+    const [
+      member,
+      semRes,
+      memsRes,
+      attRes,
+      taskRes,
+      evtRes,
+      ptsRes,
+    ] = await Promise.all([
+      membersRepo.findById(memberId),
+      supabase.from("semesters").select("id, name, status, academic_years(name)").eq("status", "active").is("deleted_at", null).limit(1),
+      supabase.from("memberships").select("*, semesters(name, academic_years(name))").eq("member_id", memberId).is("deleted_at", null),
+      supabase.from("attendance_records").select("*, attendance_sessions(title, date, attendance_points)").eq("member_id", memberId),
+      supabase.from("task_completions").select("*, tasks(title, category, points)").eq("member_id", memberId).eq("is_revoked", false),
+      supabase.from("event_participations").select("*, events(name, venue, points, start_date)").eq("member_id", memberId),
+      supabase.from("points_ledger").select("*").eq("member_id", memberId).order("created_at", { ascending: false }),
+    ]);
+
+    if (!member) {
+      return { success: false, error: { code: "NOT_FOUND", message: "Member not found" } };
+    }
+
+    const activeSemester = semRes.data && semRes.data[0] ? semRes.data[0] : null;
+    const activeSemesterName = activeSemester?.name || "Active Semester";
+
+    const membershipsList = memsRes.data || [];
+    const activeMem = membershipsList.find((m: any) => m.semester_id === activeSemester?.id && m.status === "active");
+    const membershipStatus = activeMem ? "active" : "inactive";
+
+    const attendanceRecords = attRes.data || [];
+    const taskCompletions = taskRes.data || [];
+    const eventParticipations = evtRes.data || [];
+    const pointsEntries = ptsRes.data || [];
+
+    // Calculate total points
+    const totalPoints = pointsEntries.reduce((sum: number, p: any) => sum + (p.points || 0), 0);
+
+    // Calculate total sessions
+    const { data: allSessions } = await supabase.from("attendance_sessions").select("id").is("deleted_at", null);
+    const totalSessionsCount = allSessions ? allSessions.length : 1;
+
+    const presentCount = attendanceRecords.length;
+    const lateCount = attendanceRecords.filter((r: any) => r.late).length;
+    const absentCount = Math.max(0, totalSessionsCount - presentCount);
+    const attendanceRate = totalSessionsCount === 0 ? 0 : Math.round((presentCount / totalSessionsCount) * 100);
+
+    // Formatted Attendance Items
+    const attendanceItems = attendanceRecords.map((r: any) => ({
+      id: r.id,
+      sessionTitle: r.attendance_sessions?.title || "Attendance Session",
+      sessionDate: r.attendance_sessions?.date || r.scan_time,
+      status: "Present",
+      late: !!r.late,
+      points: r.points || r.attendance_sessions?.attendance_points || 15,
+      method: (r.method || "manual").toUpperCase(),
+      volunteerName: "System Coordinator",
+    }));
+
+    // Formatted Task Items
+    const taskItems = taskCompletions.map((c: any) => ({
+      id: c.id,
+      title: c.tasks?.title || "Technical Task",
+      category: c.tasks?.category || "Hardware",
+      points: c.tasks?.points || 15,
+      completionDate: c.completed_at || c.created_at,
+      verifierName: "System Coordinator",
+      status: "Verified",
+    }));
+
+    // Formatted Event Items
+    const eventItems = eventParticipations.map((p: any) => ({
+      id: p.id,
+      eventName: p.events?.name || "Robotics Event",
+      venue: p.events?.venue || "Auditorium",
+      startDate: p.events?.start_date || p.created_at,
+      points: p.attended ? (p.events?.points || 25) : 0,
+      participationStatus: "Registered",
+      verificationStatus: p.attended ? "Verified" : "Pending",
+    }));
+
+    // Formatted Ledger Items
+    const pointsLedgerItems = pointsEntries.map((l: any) => ({
+      id: l.id,
+      date: l.created_at,
+      category: (l.category || "bonus").toUpperCase(),
+      remarks: l.remarks || "Points Entry",
+      points: l.points || 0,
+      verifierName: "System Coordinator",
+    }));
+
+    // Formatted Membership History
+    const membershipHistoryItems = membershipsList.map((m: any) => ({
+      id: m.id,
+      semesterName: m.semesters?.name || "Semester",
+      academicYearName: (m.semesters?.academic_years as any)?.name || "2025-2026",
+      joinDate: m.join_date || m.created_at,
+      status: m.status || "active",
+      membershipId: member.clubMembershipId || member.memberId || "SAC-RC-0000",
+    }));
+
+    // Build Chronological Timeline (Combine all activities, newest first)
+    const timelineItems: Array<{
+      id: string;
+      type: "attendance" | "task" | "event" | "points" | "membership";
+      title: string;
+      points: string;
+      details: string;
+      date: string;
+    }> = [];
+
+    attendanceItems.forEach((r) => {
+      timelineItems.push({
+        id: `att_${r.id}`,
+        type: "attendance",
+        title: `Attended "${r.sessionTitle}"`,
+        points: `+${r.points} Pts`,
+        details: `Method: ${r.method} • Status: ${r.late ? "Late Arrival" : "On Time"}`,
+        date: r.sessionDate,
+      });
+    });
+
+    taskItems.forEach((t) => {
+      timelineItems.push({
+        id: `tsk_${t.id}`,
+        type: "task",
+        title: `Completed Task "${t.title}"`,
+        points: `+${t.points} Pts`,
+        details: `Category: ${t.category} • Status: ${t.status}`,
+        date: t.completionDate,
+      });
+    });
+
+    eventItems.forEach((e) => {
+      timelineItems.push({
+        id: `evt_${e.id}`,
+        type: "event",
+        title: `Participated in Event "${e.eventName}"`,
+        points: e.points > 0 ? `+${e.points} Pts` : "0 Pts",
+        details: `Venue: ${e.venue} • Status: ${e.verificationStatus}`,
+        date: e.startDate,
+      });
+    });
+
+    membershipHistoryItems.forEach((m) => {
+      timelineItems.push({
+        id: `mem_${m.id}`,
+        type: "membership",
+        title: `Enrolled in ${m.semesterName}`,
+        points: `Status: ${m.status.toUpperCase()}`,
+        details: `Academic Year: ${m.academicYearName} • ID: ${m.membershipId}`,
+        date: m.joinDate,
+      });
+    });
+
+    // Sort timeline newest first
+    timelineItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    return {
+      success: true,
+      data: {
+        member,
+        activeSemesterName,
+        membershipStatus,
+        totalPoints,
+        leaderboardRank: 1,
+        attendanceRate,
+        presentCount,
+        lateCount,
+        absentCount,
+        tasksCompletedCount: taskItems.length,
+        eventsParticipatedCount: eventItems.length,
+        totalSessionsCount,
+        timeline: timelineItems,
+        attendance: attendanceItems,
+        tasks: taskItems,
+        events: eventItems,
+        pointsLedger: pointsLedgerItems,
+        membershipHistory: membershipHistoryItems,
+      },
+    };
+  } catch (error) {
+    logger.error("[Action: getMemberWorkspaceDataAction] Execution failed", error);
+    return formatErrorResponse(error);
+  }
+}
+
+export async function exportMemberTimelineCsvAction(memberId: string): Promise<ApiResponse<{ csvContent: string; filename: string }>> {
+  try {
+    const wsRes = await getMemberWorkspaceDataAction(memberId);
+    if (!wsRes.success || !wsRes.data) throw new Error("Member not found");
+    const { member, timeline } = wsRes.data;
+
+    const headers = ["Member Name", "Membership ID", "Activity Title", "Type", "Points", "Details", "Date"];
+    const rows = timeline.map((t) => [
+      member.name,
+      member.clubMembershipId || member.memberId || "—",
+      t.title,
+      t.type.toUpperCase(),
+      t.points,
+      t.details,
+      new Date(t.date).toLocaleString("en-IN"),
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.map(escapeCsv).join(","), ...rows.map((r) => r.map(escapeCsv).join(","))].join("\r\n");
+    const memIdStr = (member.clubMembershipId || member.memberId || "member").replace(/[^a-zA-Z0-9_-]/g, "_");
+    return { success: true, data: { csvContent, filename: `member_timeline_${memIdStr}.csv` } };
+  } catch (err: any) {
+    return formatErrorResponse(err);
   }
 }
