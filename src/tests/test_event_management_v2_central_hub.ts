@@ -100,7 +100,7 @@ async function main() {
     console.error("❌ Generate event CSV report failed:", reportRes.error);
     process.exit(1);
   }
-  console.log(`✅ Step 6: Generated Aggregated Event CSV Report! Size: ${reportRes.data.length} bytes`);
+  console.log(`✅ Step 6: Generated Aggregated Event CSV Report! Size: ${reportRes.data.csvContent.length} bytes`);
 
   console.log("=================================================");
   console.log("🎉 Event Management v2 Central Hub Verification PASSED!");

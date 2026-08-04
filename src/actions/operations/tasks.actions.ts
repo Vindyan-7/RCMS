@@ -2,6 +2,7 @@
 
 /**
  * Operations Domain - Tasks Server Actions
+ * Production Polish: Enriched completions & Task CSV Export
  */
 
 import { ApiResponse, PaginationQuery } from "@/core/types";
@@ -15,6 +16,7 @@ import { formatErrorResponse } from "@/core/errors";
 import { logger } from "@/core/logger";
 import { Authorizer, PERMISSIONS } from "@/core/security/rbac";
 import { PaginatedResult } from "@/core/repository/repository.types";
+import { supabase } from "@/db";
 
 const tasksRepo = new TasksRepository();
 const completionsRepo = new TaskCompletionsRepository();
@@ -28,6 +30,12 @@ async function getActorContext() {
     role: "super_admin",
     permissions: [PERMISSIONS.ACTIVITIES_CREATE, PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.ACTIVITIES_EDIT, PERMISSIONS.ACTIVITIES_COMPLETE],
   };
+}
+
+function escapeCsv(val: any): string {
+  if (val === null || val === undefined) return '""';
+  const str = String(val).replace(/"/g, '""');
+  return `"${str}"`;
 }
 
 export async function createTaskAction(
@@ -90,7 +98,7 @@ export async function completeTaskAction(
       actor.id
     );
 
-    // ── Write to points ledger so rankings reflect the award immediately ──
+    // Sync points to ledger
     try {
       const task = await tasksRepo.findById(validatedInput.taskId);
       const pts = (task as any)?.points ?? (task as any)?.pointsValue ?? 0;
@@ -106,7 +114,6 @@ export async function completeTaskAction(
         });
       }
     } catch (ledgerErr) {
-      // Non-fatal: task completion is already saved; just log
       logger.warn("[Action: completeTaskAction] Ledger write skipped", { error: String(ledgerErr) });
     }
 
@@ -123,17 +130,37 @@ export async function completeTaskAction(
 export async function getTaskCompletionsAction(
   taskId: string,
   pagination?: PaginationQuery
-): Promise<ApiResponse<PaginatedResult<TaskCompletionSelect>>> {
-  logger.debug("[Action: getTaskCompletionsAction] Initiating action execution", { taskId });
+): Promise<ApiResponse<PaginatedResult<any>>> {
+  logger.debug("[Action: getTaskCompletionsAction] Initiating action execution with member enrichment", { taskId });
   try {
     const actor = await getActorContext();
     Authorizer.hasPermission(actor, PERMISSIONS.ACTIVITIES_VIEW);
 
     const completions = await tasksService.getTaskCompletions(taskId, pagination || {});
+    const items = completions.items || [];
+
+    // Fetch member details for enrichment
+    const { data: membersData } = await supabase.from("members").select("id, name, member_id, club_membership_id, branch");
+    const memberMap = new Map((membersData || []).map((m: any) => [m.id, m]));
+
+    const enrichedItems = items.map((c: any) => {
+      const mem = memberMap.get(c.memberId);
+      return {
+        ...c,
+        memberName: mem?.name || "Member",
+        membershipId: mem?.club_membership_id || mem?.member_id || "—",
+        branch: (mem?.branch || "—").toUpperCase(),
+        verifierName: "System Coordinator",
+        verificationStatus: c.isRevoked ? "Revoked" : "Verified",
+      };
+    });
 
     return {
       success: true,
-      data: completions,
+      data: {
+        ...completions,
+        items: enrichedItems,
+      },
     };
   } catch (error) {
     logger.error("[Action: getTaskCompletionsAction] Execution failed", error);
@@ -160,6 +187,7 @@ export async function getTasksAction(
     return formatErrorResponse(error);
   }
 }
+
 export async function revokeTaskCompletionAction(
   completionId: string
 ): Promise<ApiResponse<boolean>> {
@@ -168,7 +196,7 @@ export async function revokeTaskCompletionAction(
     const actor = await getActorContext();
     Authorizer.hasPermission(actor, PERMISSIONS.ACTIVITIES_COMPLETE);
 
-    const success = await completionsRepo.revoke(completionId, actor.id, "Revoked via Points Engine");
+    const success = await completionsRepo.revoke(completionId, actor.id, "Revoked via Operations Workspace");
 
     return { success, data: success };
   } catch (error) {
@@ -177,8 +205,6 @@ export async function revokeTaskCompletionAction(
   }
 }
 
-// Returns a map of { memberId -> completion } for a given task
-// so the Points Engine knows which members already completed the task
 export async function getTaskMemberCompletionsAction(
   taskId: string
 ): Promise<ApiResponse<Record<string, TaskCompletionSelect>>> {
@@ -199,6 +225,91 @@ export async function getTaskMemberCompletionsAction(
     return { success: true, data: completionMap };
   } catch (error) {
     logger.error("[Action: getTaskMemberCompletionsAction] Execution failed", error);
+    return formatErrorResponse(error);
+  }
+}
+
+export async function exportTaskCsvAction(
+  taskId: string
+): Promise<ApiResponse<{ csvContent: string; filename: string }>> {
+  logger.info("[Action: exportTaskCsvAction] Generating task completions CSV", { taskId });
+  try {
+    const actor = await getActorContext();
+    Authorizer.hasPermission(actor, PERMISSIONS.ACTIVITIES_VIEW);
+
+    const task = await tasksRepo.findById(taskId);
+    if (!task) {
+      return { success: false, error: { code: "NOT_FOUND", message: "Task not found" } };
+    }
+
+    // Active Semester Name
+    const { data: semData } = await supabase
+      .from("semesters")
+      .select("name")
+      .eq("status", "active")
+      .is("deleted_at", null)
+      .limit(1);
+    const semesterName = semData && semData[0] ? semData[0].name : "Active Semester";
+
+    // Task completions
+    const completionsRes = await completionsRepo.getByTaskId(taskId, { limit: 1000 });
+    const completions = completionsRes.items || [];
+
+    const { data: membersData } = await supabase.from("members").select("id, name, member_id, club_membership_id, branch");
+    const memberMap = new Map((membersData || []).map((m: any) => [m.id, m]));
+
+    const headers = [
+      "Task Name",
+      "Semester",
+      "Member Name",
+      "Membership ID",
+      "Branch",
+      "Completion Date",
+      "Points Awarded",
+      "Verifier",
+    ];
+
+    const taskPoints = (task as any).points ?? 20;
+
+    const rows = completions
+      .filter((c: any) => !c.isRevoked)
+      .map((c: any) => {
+        const mem = memberMap.get(c.memberId);
+        const compDateStr = c.completedAt
+          ? new Date(c.completedAt).toLocaleString("en-IN")
+          : c.createdAt
+          ? new Date(c.createdAt).toLocaleString("en-IN")
+          : "—";
+
+        return [
+          task.title,
+          semesterName,
+          mem?.name || "Member",
+          mem?.club_membership_id || mem?.member_id || "—",
+          (mem?.branch || "—").toUpperCase(),
+          compDateStr,
+          String(taskPoints),
+          "System Coordinator",
+        ];
+      });
+
+    const csvContent = "\uFEFF" + [
+      headers.map(escapeCsv).join(","),
+      ...rows.map((row) => row.map(escapeCsv).join(",")),
+    ].join("\r\n");
+
+    const sanitizedTitle = task.title.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const filename = `task_${sanitizedTitle}.csv`;
+
+    return {
+      success: true,
+      data: {
+        csvContent,
+        filename,
+      },
+    };
+  } catch (error) {
+    logger.error("[Action: exportTaskCsvAction] Execution failed", error);
     return formatErrorResponse(error);
   }
 }
