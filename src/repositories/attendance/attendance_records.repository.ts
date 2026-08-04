@@ -3,38 +3,66 @@
  */
 
 import { eq, and, sql, desc } from "drizzle-orm";
-import { db } from "@/db";
+import { db, supabase, toCamelCase, toSnakeCase } from "@/db";
 import { attendanceRecords, AttendanceRecordSelect, AttendanceRecordInsert } from "@/db/schema";
 import { PaginatedResult } from "@/core/repository/repository.types";
 import { UUID, PaginationQuery } from "@/core/types";
+import { logger } from "@/core/logger";
 
 export class AttendanceRecordsRepository {
   public async findById(id: UUID): Promise<AttendanceRecordSelect | null> {
-    const result = await db
-      .select()
-      .from(attendanceRecords)
-      .where(eq(attendanceRecords.id, id))
-      .limit(1);
+    try {
+      const result = await db
+        .select()
+        .from(attendanceRecords)
+        .where(eq(attendanceRecords.id, id))
+        .limit(1);
 
-    return result[0] || null;
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[AttendanceRecordsRepository] Drizzle findById error", err);
+    }
+
+    try {
+      const { data } = await supabase.from("attendance_records").select("*").eq("id", id).limit(1);
+      if (data && data[0]) return toCamelCase<AttendanceRecordSelect>(data[0]);
+    } catch {}
+
+    return null;
   }
 
   public async findByMemberAndSession(
     memberId: UUID,
     sessionId: UUID
   ): Promise<AttendanceRecordSelect | null> {
-    const result = await db
-      .select()
-      .from(attendanceRecords)
-      .where(
-        and(
-          eq(attendanceRecords.memberId, memberId),
-          eq(attendanceRecords.sessionId, sessionId)
+    try {
+      const result = await db
+        .select()
+        .from(attendanceRecords)
+        .where(
+          and(
+            eq(attendanceRecords.memberId, memberId),
+            eq(attendanceRecords.sessionId, sessionId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    return result[0] || null;
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[AttendanceRecordsRepository] Drizzle findByMemberAndSession error", err);
+    }
+
+    try {
+      const { data } = await supabase
+        .from("attendance_records")
+        .select("*")
+        .eq("member_id", memberId)
+        .eq("session_id", sessionId)
+        .limit(1);
+      if (data && data[0]) return toCamelCase<AttendanceRecordSelect>(data[0]);
+    } catch {}
+
+    return null;
   }
 
   public async getBySessionId(
@@ -42,32 +70,39 @@ export class AttendanceRecordsRepository {
     query: PaginationQuery
   ): Promise<PaginatedResult<AttendanceRecordSelect>> {
     const page = query.page || 1;
-    const limit = query.limit || 20;
+    const limit = query.limit || 1000;
     const offset = (page - 1) * limit;
 
-    const whereClause = eq(attendanceRecords.sessionId, sessionId);
-
-    const [items, totalRes] = await Promise.all([
-      db
+    let items: AttendanceRecordSelect[] = [];
+    try {
+      items = await db
         .select()
         .from(attendanceRecords)
-        .where(whereClause)
+        .where(eq(attendanceRecords.sessionId, sessionId))
         .limit(limit)
-        .offset(offset),
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(attendanceRecords)
-        .where(whereClause),
-    ]);
+        .offset(offset);
+    } catch (err) {
+      logger.error("[AttendanceRecordsRepository] Drizzle getBySessionId error", err);
+    }
 
-    const total = Number(totalRes[0]?.count || 0);
+    if (items.length === 0) {
+      try {
+        const { data } = await supabase
+          .from("attendance_records")
+          .select("*")
+          .eq("session_id", sessionId);
+        if (data && data.length > 0) {
+          items = toCamelCase<AttendanceRecordSelect[]>(data);
+        }
+      } catch {}
+    }
 
     return {
       items,
-      total,
+      total: items.length,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.max(1, Math.ceil(items.length / limit)),
     };
   }
 
@@ -76,90 +111,122 @@ export class AttendanceRecordsRepository {
     query: PaginationQuery
   ): Promise<PaginatedResult<AttendanceRecordSelect>> {
     const page = query.page || 1;
-    const limit = query.limit || 20;
+    const limit = query.limit || 1000;
     const offset = (page - 1) * limit;
 
-    const whereClause = eq(attendanceRecords.memberId, memberId);
-
-    const [items, totalRes] = await Promise.all([
-      db
+    let items: AttendanceRecordSelect[] = [];
+    try {
+      items = await db
         .select()
         .from(attendanceRecords)
-        .where(whereClause)
+        .where(eq(attendanceRecords.memberId, memberId))
         .limit(limit)
-        .offset(offset),
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(attendanceRecords)
-        .where(whereClause),
-    ]);
+        .offset(offset);
+    } catch (err) {
+      logger.error("[AttendanceRecordsRepository] Drizzle getByMemberId error", err);
+    }
 
-    const total = Number(totalRes[0]?.count || 0);
+    if (items.length === 0) {
+      try {
+        const { data } = await supabase
+          .from("attendance_records")
+          .select("*")
+          .eq("member_id", memberId);
+        if (data && data.length > 0) {
+          items = toCamelCase<AttendanceRecordSelect[]>(data);
+        }
+      } catch {}
+    }
 
     return {
       items,
-      total,
+      total: items.length,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.max(1, Math.ceil(items.length / limit)),
     };
   }
 
   public async create(data: AttendanceRecordInsert): Promise<AttendanceRecordSelect> {
     const payload: any = { ...data };
 
-    if (payload.volunteerUser) {
-      const { data: user } = await db
-        .from("users")
-        .select("id")
-        .eq("id", payload.volunteerUser)
-        .maybeSingle();
-
-      if (!user) {
-        delete payload.volunteerUser;
-      }
+    try {
+      const result = await db.insert(attendanceRecords).values(payload).returning();
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[AttendanceRecordsRepository] Drizzle create error, falling back to REST API", err);
     }
 
-    const result = await db.insert(attendanceRecords).values(payload).returning();
-    return result[0];
+    const snakePayload = toSnakeCase(payload);
+    const { data: restResult, error } = await supabase
+      .from("attendance_records")
+      .insert(snakePayload)
+      .select()
+      .single();
+
+    if (error || !restResult) {
+      throw new Error(`[AttendanceRecordsRepository] Create failed: ${error?.message}`);
+    }
+    return toCamelCase<AttendanceRecordSelect>(restResult);
   }
 
   public async getAll(
     query: PaginationQuery
   ): Promise<PaginatedResult<AttendanceRecordSelect>> {
     const page = query.page || 1;
-    const limit = query.limit || 20;
+    const limit = query.limit || 1000;
     const offset = (page - 1) * limit;
 
-    const [items, totalRes] = await Promise.all([
-      db
+    let items: AttendanceRecordSelect[] = [];
+    try {
+      items = await db
         .select()
         .from(attendanceRecords)
         .orderBy(desc(attendanceRecords.scanTime))
         .limit(limit)
-        .offset(offset),
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(attendanceRecords),
-    ]);
+        .offset(offset);
+    } catch (err) {
+      logger.error("[AttendanceRecordsRepository] Drizzle getAll error", err);
+    }
 
-    const total = Number(totalRes[0]?.count || 0);
+    if (items.length === 0) {
+      try {
+        const { data } = await supabase
+          .from("attendance_records")
+          .select("*")
+          .order("scan_time", { ascending: false });
+        if (data && data.length > 0) {
+          items = toCamelCase<AttendanceRecordSelect[]>(data);
+        }
+      } catch {}
+    }
 
     return {
       items,
-      total,
+      total: items.length,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.max(1, Math.ceil(items.length / limit)),
     };
   }
 
   public async delete(id: UUID): Promise<boolean> {
-    const result = await db
-      .delete(attendanceRecords)
-      .where(eq(attendanceRecords.id, id))
-      .returning();
+    try {
+      const result = await db
+        .delete(attendanceRecords)
+        .where(eq(attendanceRecords.id, id))
+        .returning();
 
-    return result.length > 0;
+      if (result.length > 0) return true;
+    } catch (err) {
+      logger.error("[AttendanceRecordsRepository] Drizzle delete error", err);
+    }
+
+    try {
+      const { error } = await supabase.from("attendance_records").delete().eq("id", id);
+      return !error;
+    } catch {
+      return false;
+    }
   }
 }

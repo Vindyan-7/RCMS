@@ -3,11 +3,12 @@
  */
 
 import { eq, and, isNull, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { db, supabase, toCamelCase } from "@/db";
 import { events, EventSelect, EventInsert } from "@/db/schema";
 import { BaseRepository } from "@/core/repository/base-repository";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
 import { UUID, PaginationQuery } from "@/core/types";
+import { logger } from "@/core/logger";
 
 export class EventsRepository extends BaseRepository<
   EventSelect,
@@ -27,13 +28,24 @@ export class EventsRepository extends BaseRepository<
       conditions.push(isNull(events.deletedAt));
     }
 
-    const result = await db
-      .select()
-      .from(events)
-      .where(and(...conditions))
-      .limit(1);
+    try {
+      const result = await db
+        .select()
+        .from(events)
+        .where(and(...conditions))
+        .limit(1);
 
-    return result[0] || null;
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[EventsRepository] Drizzle findById error", err);
+    }
+
+    try {
+      const { data } = await supabase.from("events").select("*").eq("id", id).limit(1);
+      if (data && data[0]) return toCamelCase<EventSelect>(data[0]);
+    } catch {}
+
+    return null;
   }
 
   public async findAll(
@@ -41,7 +53,7 @@ export class EventsRepository extends BaseRepository<
     options?: QueryOptions
   ): Promise<PaginatedResult<EventSelect>> {
     const page = query.page || 1;
-    const limit = query.limit || 20;
+    const limit = query.limit || 1000;
     const offset = (page - 1) * limit;
 
     const conditions = [];
@@ -51,27 +63,33 @@ export class EventsRepository extends BaseRepository<
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [items, totalRes] = await Promise.all([
-      db
+    let items: EventSelect[] = [];
+    try {
+      items = await db
         .select()
         .from(events)
         .where(whereClause)
         .limit(limit)
-        .offset(offset),
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(events)
-        .where(whereClause),
-    ]);
+        .offset(offset);
+    } catch (err) {
+      logger.error("[EventsRepository] Drizzle findAll error", err);
+    }
 
-    const total = Number(totalRes[0]?.count || 0);
+    if (items.length === 0) {
+      try {
+        const { data } = await supabase.from("events").select("*").is("deleted_at", null);
+        if (data && data.length > 0) {
+          items = toCamelCase<EventSelect[]>(data);
+        }
+      } catch {}
+    }
 
     return {
       items,
-      total,
+      total: items.length,
       page,
       limit,
-      totalPages: this.calculateTotalPages(total, limit),
+      totalPages: this.calculateTotalPages(items.length, limit),
     };
   }
 

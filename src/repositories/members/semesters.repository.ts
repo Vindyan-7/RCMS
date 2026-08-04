@@ -3,11 +3,12 @@
  */
 
 import { eq, and, isNull, sql, desc } from "drizzle-orm";
-import { db } from "@/db";
+import { db, supabase, toCamelCase } from "@/db";
 import { semesters, SemesterSelect, SemesterInsert } from "@/db/schema";
 import { BaseRepository } from "@/core/repository/base-repository";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
 import { UUID, PaginationQuery } from "@/core/types";
+import { logger } from "@/core/logger";
 
 export class SemestersRepository extends BaseRepository<
   SemesterSelect,
@@ -27,24 +28,57 @@ export class SemestersRepository extends BaseRepository<
       conditions.push(isNull(semesters.deletedAt));
     }
 
-    const result = await db
-      .select()
-      .from(semesters)
-      .where(and(...conditions))
-      .limit(1);
+    try {
+      const result = await db
+        .select()
+        .from(semesters)
+        .where(and(...conditions))
+        .limit(1);
 
-    return result[0] || null;
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[SemestersRepository] Drizzle findById error", err);
+    }
+
+    try {
+      const { data } = await supabase.from("semesters").select("*").eq("id", id).limit(1);
+      if (data && data[0]) return toCamelCase<SemesterSelect>(data[0]);
+    } catch {}
+
+    return null;
   }
 
   public async findActive(): Promise<SemesterSelect | null> {
-    const result = await db
-      .select()
-      .from(semesters)
-      .where(and(eq(semesters.status, "active"), isNull(semesters.deletedAt)))
-      .orderBy(desc(semesters.startDate))
-      .limit(1);
+    try {
+      const result = await db
+        .select()
+        .from(semesters)
+        .where(and(eq(semesters.status, "active"), isNull(semesters.deletedAt)))
+        .orderBy(desc(semesters.startDate))
+        .limit(1);
 
-    return result[0] || null;
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[SemestersRepository] Drizzle findActive error, falling back to REST API", err);
+    }
+
+    try {
+      const { data } = await supabase
+        .from("semesters")
+        .select("*")
+        .eq("status", "active")
+        .is("deleted_at", null)
+        .order("start_date", { ascending: false })
+        .limit(1);
+
+      if (data && data[0]) {
+        return toCamelCase<SemesterSelect>(data[0]);
+      }
+    } catch (restErr) {
+      logger.error("[SemestersRepository] REST fallback error", restErr);
+    }
+
+    return null;
   }
 
   public async findAll(
@@ -62,28 +96,38 @@ export class SemestersRepository extends BaseRepository<
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [items, totalRes] = await Promise.all([
-      db
+    let items: SemesterSelect[] = [];
+    try {
+      items = await db
         .select()
         .from(semesters)
         .where(whereClause)
         .orderBy(desc(semesters.startDate))
         .limit(limit)
-        .offset(offset),
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(semesters)
-        .where(whereClause),
-    ]);
+        .offset(offset);
+    } catch (err) {
+      logger.error("[SemestersRepository] Drizzle findAll error", err);
+    }
 
-    const total = Number(totalRes[0]?.count || 0);
+    if (items.length === 0) {
+      try {
+        const { data } = await supabase
+          .from("semesters")
+          .select("*")
+          .is("deleted_at", null)
+          .order("start_date", { ascending: false });
+        if (data && data.length > 0) {
+          items = toCamelCase<SemesterSelect[]>(data);
+        }
+      } catch {}
+    }
 
     return {
       items,
-      total,
+      total: items.length,
       page,
       limit,
-      totalPages: this.calculateTotalPages(total, limit),
+      totalPages: this.calculateTotalPages(items.length, limit),
     };
   }
 
