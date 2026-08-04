@@ -1,29 +1,24 @@
-import { getKpiMetricsAction, getSystemInsightsAction } from "@/actions/intelligence";
+import { getAnalyticsDashboardAction } from "@/actions/intelligence/intelligence.actions";
 import { AnalyticsClient } from "@/components/analytics/analytics-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function AnalyticsPage() {
-  const [kpiRes, insightsRes] = await Promise.all([
-    getKpiMetricsAction(),
-    getSystemInsightsAction(),
-  ]);
-
-  const kpis = kpiRes.data || null;
-  const insights = insightsRes.data || [];
+  const res = await getAnalyticsDashboardAction();
+  const analyticsData = res.data || null;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          Executive Analytics & Intelligence Platform
+          RCMS Command Center — Executive Analytics 2.0
         </h1>
         <p className="text-sm text-muted-foreground">
-          Cross-module analytics, role-specific executive consoles (President, Treasurer, Faculty), and automated actionable recommendations
+          Single source of truth for Robotics Club operational health, membership growth, attendance metrics, points engine, and semester lifecycle.
         </p>
       </div>
 
-      <AnalyticsClient initialKpis={kpis} initialInsights={insights} />
+      <AnalyticsClient initialAnalytics={analyticsData} />
     </div>
   );
 }

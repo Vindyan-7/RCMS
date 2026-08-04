@@ -98,3 +98,22 @@ export async function getSystemInsightsAction(): Promise<ApiResponse<SystemInsig
     return formatErrorResponse(error);
   }
 }
+
+export async function getAnalyticsDashboardAction(): Promise<ApiResponse<import("@/services/intelligence").AnalyticsDashboardResponse>> {
+  logger.info("[Action: getAnalyticsDashboardAction] Initiating single-source-of-truth command center fetch");
+  try {
+    const actor = await getActorContext();
+    Authorizer.hasPermission(actor, PERMISSIONS.SETTINGS_VIEW);
+
+    const analyticsService = new (await import("@/services/intelligence")).AnalyticsDashboardService();
+    const data = await analyticsService.getAnalyticsDashboardData();
+
+    return {
+      success: true,
+      data,
+    };
+  } catch (error) {
+    logger.error("[Action: getAnalyticsDashboardAction] Execution failed", error);
+    return formatErrorResponse(error);
+  }
+}
