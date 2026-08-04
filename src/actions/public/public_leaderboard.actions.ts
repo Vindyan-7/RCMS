@@ -93,7 +93,7 @@ export async function getPublicLeaderboardAction(): Promise<{
       }
     }
 
-    // 4. Fetch attendance sessions & records for attendance rate calculation
+    // 4. Fetch attendance sessions & records
     let sessionCount = 0;
     let recsData: any[] = [];
 
@@ -110,7 +110,7 @@ export async function getPublicLeaderboardAction(): Promise<{
       if (sessionIds.length > 0) {
         const { data: recs } = await supabase
           .from("attendance_records")
-          .select("member_id, status")
+          .select("member_id")
           .in("session_id", sessionIds);
         recsData = recs || [];
       }
@@ -119,7 +119,7 @@ export async function getPublicLeaderboardAction(): Promise<{
     if (recsData.length === 0) {
       const [sessRes, recsRes] = await Promise.all([
         supabase.from("attendance_sessions").select("id").is("deleted_at", null),
-        supabase.from("attendance_records").select("member_id, status"),
+        supabase.from("attendance_records").select("member_id"),
       ]);
       sessionCount = sessRes.data?.length || 0;
       recsData = recsRes.data || [];
@@ -127,7 +127,7 @@ export async function getPublicLeaderboardAction(): Promise<{
 
     const presentMap: Record<string, number> = {};
     for (const rec of recsData) {
-      if (rec.status === "present" || rec.status === "late") {
+      if (rec.member_id) {
         presentMap[rec.member_id] = (presentMap[rec.member_id] || 0) + 1;
       }
     }
@@ -155,6 +155,9 @@ export async function getPublicLeaderboardAction(): Promise<{
       if (sessionCount > 0) {
         attendanceRate = Math.min(100, Math.round((presentCount / sessionCount) * 100));
       } else if (presentCount > 0) {
+        attendanceRate = 100;
+      } else {
+        // Default to 100% when no sessions created yet in semester
         attendanceRate = 100;
       }
 
