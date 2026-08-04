@@ -7,6 +7,13 @@ export const metadata: Metadata = {
     template: "%s | Robotics Club",
   },
   description: "Official Robotics Club Portal",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
   openGraph: {
     title: "Robotics Club",
     description: "Official Robotics Club Portal",
