@@ -4,7 +4,8 @@
  * Attendance & Volunteer Authentication Client Component
  */
 
-import { useState, useTransition, useEffect, useCallback } from "react";
+import { useState, useTransition, useEffect, useCallback, useMemo } from "react";
+import { sortMembersByClubMembershipId } from "@/core/utils/member-sorting";
 import {
   createAttendanceSessionAction,
   openAttendanceSessionAction,
@@ -159,16 +160,22 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
     });
   };
 
-  const filteredEnrolledMembers = enrolledMembers.filter((m) => {
-    if (!attendanceSearch.trim()) return true;
-    const q = attendanceSearch.toLowerCase();
-    const name = (m.name || "").toLowerCase();
-    const roll = (m.rollNumber || "").toLowerCase();
-    const clubId = (m.clubMembershipId || "").toLowerCase();
-    const memId = (m.memberId || "").toLowerCase();
+  const sortedEnrolledMembers = useMemo(() => {
+    return sortMembersByClubMembershipId(enrolledMembers);
+  }, [enrolledMembers]);
 
-    return name.includes(q) || roll.includes(q) || clubId.includes(q) || memId.includes(q);
-  });
+  const filteredEnrolledMembers = useMemo(() => {
+    return sortedEnrolledMembers.filter((m) => {
+      if (!attendanceSearch.trim()) return true;
+      const q = attendanceSearch.toLowerCase();
+      const name = (m.name || "").toLowerCase();
+      const roll = (m.rollNumber || "").toLowerCase();
+      const clubId = (m.clubMembershipId || "").toLowerCase();
+      const memId = (m.memberId || "").toLowerCase();
+
+      return name.includes(q) || roll.includes(q) || clubId.includes(q) || memId.includes(q);
+    });
+  }, [sortedEnrolledMembers, attendanceSearch]);
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();

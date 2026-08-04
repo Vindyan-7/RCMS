@@ -96,13 +96,15 @@ export class SemesterContextService {
   }
 
   /**
-   * Returns full Member directory records enrolled in the active semester.
+   * Returns full Member directory records enrolled in the active semester, pre-sorted by Club Membership ID in ascending order.
    */
   public async getEnrolledMembers(): Promise<MemberSelect[]> {
     const active = await this.getActiveSemester();
     if (!active) return [];
     const profiles = await this.membershipsRepo.findEnrolledMembersWithProfiles(active.id);
-    return profiles.map((p) => p.member);
+    const membersList = profiles.map((p) => p.member);
+    const { sortMembersByClubMembershipId } = await import("@/core/utils/member-sorting");
+    return sortMembersByClubMembershipId(membersList);
   }
 
   /**

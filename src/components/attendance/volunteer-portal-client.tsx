@@ -14,6 +14,7 @@ import {
   getSessionRecordsAction,
 } from "@/actions/attendance/attendance_records.actions";
 import { getEnrolledMembersForActiveSemesterAction } from "@/actions/members/semesters.actions";
+import { sortMembersByClubMembershipId } from "@/core/utils/member-sorting";
 import { AttendanceSessionSelect, VolunteerCodeSelect, MemberSelect, AttendanceRecordSelect } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -112,9 +113,10 @@ export function VolunteerPortalClient() {
       }
 
       if (membersRes.success && membersRes.data) {
-        setAllMembers(membersRes.data);
-        setTotalMembersCount(membersRes.data.length);
-        setFilteredMembers(membersRes.data);
+        const sorted = sortMembersByClubMembershipId(membersRes.data);
+        setAllMembers(sorted);
+        setTotalMembersCount(sorted.length);
+        setFilteredMembers(sorted);
       }
       setIsSearchingMembers(false);
     };
@@ -124,13 +126,14 @@ export function VolunteerPortalClient() {
 
   // Universal multi-field member search across Club Membership ID, Roll No, Name, Phone, Internal ID
   useEffect(() => {
+    const sortedAll = sortMembersByClubMembershipId(allMembers);
     if (!searchQuery.trim()) {
-      setFilteredMembers(allMembers);
+      setFilteredMembers(sortedAll);
       return;
     }
 
     const q = searchQuery.trim().toLowerCase();
-    const matches = allMembers.filter((m) => {
+    const matches = sortedAll.filter((m) => {
       const memId = (m.clubMembershipId || "").toLowerCase();
       const roll = (m.rollNumber || "").toLowerCase();
       const name = (m.name || "").toLowerCase();

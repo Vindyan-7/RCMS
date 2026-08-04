@@ -6,6 +6,7 @@
  */
 
 import { useState, useTransition, useEffect, useCallback } from "react";
+import { sortMembersByClubMembershipId } from "@/core/utils/member-sorting";
 import Link from "next/link";
 import {
   createEventAction,
@@ -998,9 +999,9 @@ export function OperationsClient({ initialEvents, initialTasks }: OperationsClie
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none"
                 >
                   <option value="">-- Select Member --</option>
-                  {enrolledMembers.map((m) => (
+                  {sortMembersByClubMembershipId(enrolledMembers).map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name} ({m.clubMembershipId || m.memberId || m.rollNumber || "Member"})
+                      {m.clubMembershipId || m.memberId || "Member"} — {m.name}
                     </option>
                   ))}
                 </select>
@@ -1038,9 +1039,9 @@ export function OperationsClient({ initialEvents, initialTasks }: OperationsClie
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none"
                 >
                   <option value="">-- Select Member --</option>
-                  {enrolledMembers.map((m) => (
+                  {sortMembersByClubMembershipId(enrolledMembers).map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name} ({m.clubMembershipId || m.memberId || m.rollNumber || "Member"})
+                      {m.clubMembershipId || m.memberId || "Member"} — {m.name}
                     </option>
                   ))}
                 </select>
