@@ -3,7 +3,7 @@
  */
 
 import { eq, and, sql, desc } from "drizzle-orm";
-import { db, supabase, toCamelCase, toSnakeCase } from "@/db";
+import { db, supabase, toCamelCase, toSnakeCase, isServerless } from "@/db";
 import { attendanceRecords, AttendanceRecordSelect, AttendanceRecordInsert } from "@/db/schema";
 import { PaginatedResult } from "@/core/repository/repository.types";
 import { UUID, PaginationQuery } from "@/core/types";
@@ -178,18 +178,7 @@ export class AttendanceRecordsRepository {
     const offset = (page - 1) * limit;
 
     let items: AttendanceRecordSelect[] = [];
-    try {
-      items = await db
-        .select()
-        .from(attendanceRecords)
-        .orderBy(desc(attendanceRecords.scanTime))
-        .limit(limit)
-        .offset(offset);
-    } catch (err) {
-      logger.error("[AttendanceRecordsRepository] Drizzle getAll error", err);
-    }
-
-    if (items.length === 0) {
+    if (isServerless) {
       try {
         const { data } = await supabase
           .from("attendance_records")
@@ -198,7 +187,32 @@ export class AttendanceRecordsRepository {
         if (data && data.length > 0) {
           items = toCamelCase<AttendanceRecordSelect[]>(data);
         }
-      } catch {}
+      } catch (err) {
+        logger.error("[AttendanceRecordsRepository] REST query error", err);
+      }
+    } else {
+      try {
+        items = await db
+          .select()
+          .from(attendanceRecords)
+          .orderBy(desc(attendanceRecords.scanTime))
+          .limit(limit)
+          .offset(offset);
+      } catch (err) {
+        logger.error("[AttendanceRecordsRepository] Drizzle getAll error", err);
+      }
+
+      if (items.length === 0) {
+        try {
+          const { data } = await supabase
+            .from("attendance_records")
+            .select("*")
+            .order("scan_time", { ascending: false });
+          if (data && data.length > 0) {
+            items = toCamelCase<AttendanceRecordSelect[]>(data);
+          }
+        } catch {}
+      }
     }
 
     return {

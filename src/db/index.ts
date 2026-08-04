@@ -20,6 +20,13 @@ const client = postgres(connectionString, { prepare: false, ssl: "require" });
 export const drizzleDb = drizzle(client, { schema });
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
+export const isServerless = Boolean(
+  process.env.VERCEL ||
+  process.env.VERCEL_ENV ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.NODE_ENV === "production"
+);
+
 export const db: any = new Proxy(drizzleDb, {
   get(target, prop, receiver) {
     if (prop === "from") {

@@ -3,7 +3,7 @@
  */
 
 import { eq, and, isNull, sql, inArray } from "drizzle-orm";
-import { db, supabase, toCamelCase } from "@/db";
+import { db, supabase, toCamelCase, toSnakeCase, isServerless } from "@/db";
 import { memberships, members, MembershipSelect, MembershipInsert, MemberSelect } from "@/db/schema";
 import { BaseRepository } from "@/core/repository/base-repository";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
@@ -25,6 +25,28 @@ export class MembershipsRepository extends BaseRepository<
   public async findEnrolledMembersWithProfiles(
     semesterId: UUID
   ): Promise<Array<{ membership: MembershipSelect; member: MemberSelect }>> {
+    if (isServerless) {
+      try {
+        const { data: memsData } = await supabase
+          .from("memberships")
+          .select("*, members(*)")
+          .eq("semester_id", semesterId)
+          .eq("status", "active")
+          .is("deleted_at", null);
+
+        if (memsData && memsData.length > 0) {
+          return memsData
+            .filter((row: any) => row.members !== null)
+            .map((row: any) => ({
+              membership: toCamelCase<MembershipSelect>(row),
+              member: toCamelCase<MemberSelect>(row.members),
+            }));
+        }
+      } catch (err) {
+        logger.error("[MembershipsRepository] REST query error", err);
+      }
+    }
+
     try {
       const rows = await db
         .select({

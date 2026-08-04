@@ -3,7 +3,7 @@
  */
 
 import { eq, or, ilike, and, isNull, sql } from "drizzle-orm";
-import { db, supabase, toCamelCase, toSnakeCase } from "@/db";
+import { db, supabase, toCamelCase, toSnakeCase, isServerless } from "@/db";
 import { members, MemberSelect, MemberInsert } from "@/db/schema";
 import { BaseRepository } from "@/core/repository/base-repository";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
@@ -121,25 +121,40 @@ export class MembersRepository extends BaseRepository<
     const includeCount = options?.includeCount ?? true;
 
     let items: MemberSelect[] = [];
-    try {
-      items = await db
-        .select()
-        .from(members)
-        .where(whereClause)
-        .limit(limit)
-        .offset(offset);
-    } catch (err) {
-      logger.error("[MembersRepository] Drizzle query error", err);
-    }
-
-    if (items.length === 0 && !query.search) {
+    if (isServerless) {
       try {
-        const { data } = await supabase.from("members").select("*").is("deleted_at", null);
+        let queryBuilder = supabase.from("members").select("*").is("deleted_at", null);
+        if (query.search) {
+          queryBuilder = queryBuilder.or(`name.ilike.%${query.search}%,roll_number.ilike.%${query.search}%,member_id.ilike.%${query.search}%,email.ilike.%${query.search}%`);
+        }
+        const { data } = await queryBuilder;
         if (data && data.length > 0) {
           items = toCamelCase<MemberSelect[]>(data);
         }
       } catch (err) {
-        logger.error("[MembersRepository] REST fallback error", err);
+        logger.error("[MembersRepository] REST query error", err);
+      }
+    } else {
+      try {
+        items = await db
+          .select()
+          .from(members)
+          .where(whereClause)
+          .limit(limit)
+          .offset(offset);
+      } catch (err) {
+        logger.error("[MembersRepository] Drizzle query error", err);
+      }
+
+      if (items.length === 0 && !query.search) {
+        try {
+          const { data } = await supabase.from("members").select("*").is("deleted_at", null);
+          if (data && data.length > 0) {
+            items = toCamelCase<MemberSelect[]>(data);
+          }
+        } catch (err) {
+          logger.error("[MembersRepository] REST fallback error", err);
+        }
       }
     }
 

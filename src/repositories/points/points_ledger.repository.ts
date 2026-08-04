@@ -2,7 +2,7 @@
  * Points Domain - Points Ledger Repository Implementation (Supabase JS Client)
  */
 
-import { db, drizzleDb, supabase, toCamelCase, toSnakeCase } from "@/db";
+import { db, drizzleDb, supabase, toCamelCase, toSnakeCase, isServerless } from "@/db";
 import { PointsLedgerSelect, PointsLedgerInsert, members, memberships } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { PaginatedResult } from "@/core/repository/repository.types";
@@ -101,28 +101,7 @@ export class PointsLedgerRepository {
     let enrolledMembers: Array<{ id: string; name: string; rollNumber: string | null; clubMembershipId: string | null; memberId: string }> = [];
 
     if (semesterId) {
-      try {
-        const rows = await drizzleDb
-          .select({
-            id: members.id,
-            name: members.name,
-            rollNumber: members.rollNumber,
-            clubMembershipId: members.clubMembershipId,
-            memberId: members.memberId,
-          })
-          .from(memberships)
-          .innerJoin(members, eq(memberships.memberId, members.id))
-          .where(
-            and(
-              eq(memberships.semesterId, semesterId),
-              eq(memberships.status, "active"),
-              isNull(memberships.deletedAt),
-              isNull(members.deletedAt)
-            )
-          );
-        enrolledMembers = rows;
-      } catch (err) {
-        logger.error("[PointsLedgerRepository] Drizzle query error in getLeaderboard, falling back to REST", err);
+      if (isServerless) {
         try {
           const { data: memsData } = await supabase
             .from("memberships")
@@ -142,8 +121,52 @@ export class PointsLedgerRepository {
                 memberId: m.members.member_id,
               }));
           }
-        } catch (restErr) {
-          logger.error("[PointsLedgerRepository] REST fallback error", restErr);
+        } catch (err) {
+          logger.error("[PointsLedgerRepository] REST query error", err);
+        }
+      } else {
+        try {
+          const rows = await drizzleDb
+            .select({
+              id: members.id,
+              name: members.name,
+              rollNumber: members.rollNumber,
+              clubMembershipId: members.clubMembershipId,
+              memberId: members.memberId,
+            })
+            .from(memberships)
+            .innerJoin(members, eq(memberships.memberId, members.id))
+            .where(
+              and(
+                eq(memberships.semesterId, semesterId),
+                eq(memberships.status, "active"),
+                isNull(memberships.deletedAt),
+                isNull(members.deletedAt)
+              )
+            );
+          enrolledMembers = rows;
+        } catch (err) {
+          logger.error("[PointsLedgerRepository] Drizzle query error in getLeaderboard, falling back to REST", err);
+          try {
+            const { data: memsData } = await supabase
+              .from("memberships")
+              .select("member_id, members(id, name, roll_number, club_membership_id, member_id)")
+              .eq("semester_id", semesterId)
+              .eq("status", "active")
+              .is("deleted_at", null);
+
+            if (memsData) {
+              enrolledMembers = memsData
+                .filter((m: any) => m.members !== null)
+                .map((m: any) => ({
+                  id: m.members.id,
+                  name: m.members.name,
+                  rollNumber: m.members.roll_number,
+                  clubMembershipId: m.members.club_membership_id,
+                  memberId: m.members.member_id,
+                }));
+            }
+          } catch {}
         }
       }
     } else {

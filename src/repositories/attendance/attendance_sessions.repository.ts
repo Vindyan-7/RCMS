@@ -3,7 +3,7 @@
  */
 
 import { eq, and, isNull, sql } from "drizzle-orm";
-import { db, supabase, toCamelCase } from "@/db";
+import { db, supabase, toCamelCase, isServerless } from "@/db";
 import { attendanceSessions, AttendanceSessionSelect, AttendanceSessionInsert } from "@/db/schema";
 import { BaseRepository } from "@/core/repository/base-repository";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
@@ -64,24 +64,35 @@ export class AttendanceSessionsRepository extends BaseRepository<
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     let items: AttendanceSessionSelect[] = [];
-    try {
-      items = await db
-        .select()
-        .from(attendanceSessions)
-        .where(whereClause)
-        .limit(limit)
-        .offset(offset);
-    } catch (err) {
-      logger.error("[AttendanceSessionsRepository] Drizzle findAll error", err);
-    }
-
-    if (items.length === 0) {
+    if (isServerless) {
       try {
         const { data } = await supabase.from("attendance_sessions").select("*").is("deleted_at", null);
         if (data && data.length > 0) {
           items = toCamelCase<AttendanceSessionSelect[]>(data);
         }
-      } catch {}
+      } catch (err) {
+        logger.error("[AttendanceSessionsRepository] REST query error", err);
+      }
+    } else {
+      try {
+        items = await db
+          .select()
+          .from(attendanceSessions)
+          .where(whereClause)
+          .limit(limit)
+          .offset(offset);
+      } catch (err) {
+        logger.error("[AttendanceSessionsRepository] Drizzle findAll error", err);
+      }
+
+      if (items.length === 0) {
+        try {
+          const { data } = await supabase.from("attendance_sessions").select("*").is("deleted_at", null);
+          if (data && data.length > 0) {
+            items = toCamelCase<AttendanceSessionSelect[]>(data);
+          }
+        } catch {}
+      }
     }
 
     return {
