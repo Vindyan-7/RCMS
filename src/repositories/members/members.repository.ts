@@ -23,72 +23,148 @@ export class MembersRepository extends BaseRepository<
     id: UUID,
     options?: { includeDeleted?: boolean }
   ): Promise<MemberSelect | null> {
+    if (isServerless) {
+      try {
+        const { data } = await supabase.from("members").select("*").eq("id", id).limit(1);
+        if (data && data[0]) return toCamelCase<MemberSelect>(data[0]);
+      } catch {}
+      return null;
+    }
+
     const conditions = [eq(members.id, id)];
     if (!options?.includeDeleted) {
       conditions.push(isNull(members.deletedAt));
     }
 
-    const result = await db
-      .select()
-      .from(members)
-      .where(and(...conditions))
-      .limit(1);
+    try {
+      const result = await db
+        .select()
+        .from(members)
+        .where(and(...conditions))
+        .limit(1);
 
-    return result[0] || null;
+      return result[0] || null;
+    } catch (err) {
+      logger.error("[MembersRepository] Drizzle findById error", err);
+    }
+
+    try {
+      const { data } = await supabase.from("members").select("*").eq("id", id).limit(1);
+      if (data && data[0]) return toCamelCase<MemberSelect>(data[0]);
+    } catch {}
+
+    return null;
   }
 
   public async findByMemberId(
     memberId: string,
     options?: { includeDeleted?: boolean }
   ): Promise<MemberSelect | null> {
+    if (isServerless) {
+      try {
+        const { data } = await supabase.from("members").select("*").eq("member_id", memberId).limit(1);
+        if (data && data[0]) return toCamelCase<MemberSelect>(data[0]);
+      } catch {}
+      return null;
+    }
+
     const conditions = [eq(members.memberId, memberId)];
     if (!options?.includeDeleted) {
       conditions.push(isNull(members.deletedAt));
     }
 
-    const result = await db
-      .select()
-      .from(members)
-      .where(and(...conditions))
-      .limit(1);
+    try {
+      const result = await db
+        .select()
+        .from(members)
+        .where(and(...conditions))
+        .limit(1);
 
-    return result[0] || null;
+      return result[0] || null;
+    } catch (err) {
+      logger.error("[MembersRepository] Drizzle findByMemberId error", err);
+    }
+
+    try {
+      const { data } = await supabase.from("members").select("*").eq("member_id", memberId).limit(1);
+      if (data && data[0]) return toCamelCase<MemberSelect>(data[0]);
+    } catch {}
+
+    return null;
   }
 
   public async findByRollNumber(
     rollNumber: string,
     options?: { includeDeleted?: boolean }
   ): Promise<MemberSelect | null> {
+    if (isServerless) {
+      try {
+        const { data } = await supabase.from("members").select("*").eq("roll_number", rollNumber).limit(1);
+        if (data && data[0]) return toCamelCase<MemberSelect>(data[0]);
+      } catch {}
+      return null;
+    }
+
     const conditions = [eq(members.rollNumber, rollNumber)];
     if (!options?.includeDeleted) {
       conditions.push(isNull(members.deletedAt));
     }
 
-    const result = await db
-      .select()
-      .from(members)
-      .where(and(...conditions))
-      .limit(1);
+    try {
+      const result = await db
+        .select()
+        .from(members)
+        .where(and(...conditions))
+        .limit(1);
 
-    return result[0] || null;
+      return result[0] || null;
+    } catch (err) {
+      logger.error("[MembersRepository] Drizzle findByRollNumber error", err);
+    }
+
+    try {
+      const { data } = await supabase.from("members").select("*").eq("roll_number", rollNumber).limit(1);
+      if (data && data[0]) return toCamelCase<MemberSelect>(data[0]);
+    } catch {}
+
+    return null;
   }
 
   public async findByEmail(
     email: string,
     options?: { includeDeleted?: boolean }
   ): Promise<MemberSelect | null> {
+    if (isServerless) {
+      try {
+        const { data } = await supabase.from("members").select("*").eq("email", email).limit(1);
+        if (data && data[0]) return toCamelCase<MemberSelect>(data[0]);
+      } catch {}
+      return null;
+    }
+
     const conditions = [eq(members.email, email)];
     if (!options?.includeDeleted) {
       conditions.push(isNull(members.deletedAt));
     }
 
-    const result = await db
-      .select()
-      .from(members)
-      .where(and(...conditions))
-      .limit(1);
+    try {
+      const result = await db
+        .select()
+        .from(members)
+        .where(and(...conditions))
+        .limit(1);
 
-    return result[0] || null;
+      return result[0] || null;
+    } catch (err) {
+      logger.error("[MembersRepository] Drizzle findByEmail error", err);
+    }
+
+    try {
+      const { data } = await supabase.from("members").select("*").eq("email", email).limit(1);
+      if (data && data[0]) return toCamelCase<MemberSelect>(data[0]);
+    } catch {}
+
+    return null;
   }
 
   public async findAll(
