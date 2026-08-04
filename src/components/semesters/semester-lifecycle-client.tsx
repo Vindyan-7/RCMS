@@ -179,8 +179,9 @@ export function SemesterLifecycleClient({ initialSemesters, initialMembers, acad
   const handleCreateSemester = async (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(async () => {
+      const targetAcademicYearId = semAcYear || (academicYears.length > 0 ? academicYears[0].id : "");
       const res = await createSemesterAction({
-        academicYearId: semAcYear,
+        academicYearId: targetAcademicYearId,
         name: semName,
         startDate: semStart,
         endDate: semEnd,
@@ -372,9 +373,32 @@ export function SemesterLifecycleClient({ initialSemesters, initialMembers, acad
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase text-muted-foreground">Academic Year *</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold uppercase text-muted-foreground">Academic Year *</label>
+                      {academicYears.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            startTransition(async () => {
+                              const { getAllAcademicYearsAction } = await import("@/actions/academic/academic_years.actions");
+                              const res = await getAllAcademicYearsAction();
+                              if (res.success && res.data && res.data.length > 0) {
+                                setAcademicYears(res.data);
+                                setSemAcYear(res.data[0].id);
+                                showFeedback("ok", "Default academic years generated.");
+                              }
+                            });
+                          }}
+                          className="text-[10px] text-primary underline hover:text-primary/80"
+                        >
+                          + Generate 4 Years
+                        </button>
+                      )}
+                    </div>
                     <select
-                      required value={semAcYear} onChange={(e) => setSemAcYear(e.target.value)}
+                      required
+                      value={semAcYear || (academicYears.length > 0 ? academicYears[0].id : "")}
+                      onChange={(e) => setSemAcYear(e.target.value)}
                       className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
                     >
                       <option value="">— Select academic year —</option>
