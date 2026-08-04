@@ -1,5 +1,9 @@
-import { supabase } from "@/db";
 import { logger } from "@/core/logger";
+import { AttendanceReportService } from "./attendance-report.service";
+import { MemberReportService } from "./member-report.service";
+import { PointsReportService } from "./points-report.service";
+import { OperationsReportService } from "./operations-report.service";
+import { TeamStudioReportService } from "./team-studio-report.service";
 
 export interface DepartmentParticipationRow {
   branch: string;
@@ -24,31 +28,98 @@ export interface ClubGrowthRow {
 }
 
 export class SemesterReportService {
+  private attReportService = new AttendanceReportService();
+  private memReportService = new MemberReportService();
+  private ptsReportService = new PointsReportService();
+  private opsReportService = new OperationsReportService();
+  private tsReportService = new TeamStudioReportService();
 
   /**
-   * 4. Department Participation Report
+   * 1. Department Participation Report — Pure Aggregation Layer
    */
-  public async getDepartmentParticipationReport(): Promise<DepartmentParticipationRow[]> {
-    logger.info("[SemesterReportService] Generating Department Participation Report");
+  public async getDepartmentParticipationReport(filters: any = {}): Promise<DepartmentParticipationRow[]> {
+    logger.info("[SemesterReportService] Aggregating Department Participation Report from domain services", filters);
 
-    return [
-      { branch: "ECE (Electronics & Communication)", membersCount: 14, attendancePct: 91.2, tasksDone: 42, eventsDone: 18, pointsShare: 1120, growthPct: 14.5 },
-      { branch: "CSE (Computer Science & Eng)", membersCount: 10, attendancePct: 88.5, tasksDone: 34, eventsDone: 12, pointsShare: 890, growthPct: 12.0 },
-      { branch: "EEE (Electrical & Electronics)", membersCount: 5, attendancePct: 84.0, tasksDone: 16, eventsDone: 8, pointsShare: 420, growthPct: 8.5 },
-      { branch: "MECH (Mechanical Engineering)", membersCount: 3, attendancePct: 80.5, tasksDone: 10, eventsDone: 4, pointsShare: 220, growthPct: 5.0 },
-    ];
+    const [attSummary, memDirectory, leaderboard, taskSummary, events] = await Promise.all([
+      this.attReportService.getAttendanceSummaryReport(filters),
+      this.memReportService.getMemberDirectoryReport(filters),
+      this.ptsReportService.getLeaderboardReport(filters),
+      this.opsReportService.getTaskCompletionSummary(filters),
+      this.opsReportService.getEventsReport(filters),
+    ]);
+
+    const branchMap = new Map<
+      string,
+      { membersCount: number; attPctSum: number; tasksDone: number; eventsDone: number; pointsShare: number }
+    >();
+
+    // Aggregate members count & branch breakdown
+    for (const m of memDirectory) {
+      const b = (m.branch || "OTHER").toUpperCase();
+      const existing = branchMap.get(b) || { membersCount: 0, attPctSum: 0, tasksDone: 0, eventsDone: 0, pointsShare: 0 };
+      existing.membersCount++;
+      branchMap.set(b, existing);
+    }
+
+    // Aggregate points & attendance from Leaderboard
+    for (const l of leaderboard) {
+      const b = (l.branch || "OTHER").toUpperCase();
+      const existing = branchMap.get(b) || { membersCount: 1, attPctSum: 0, tasksDone: 0, eventsDone: 0, pointsShare: 0 };
+      existing.pointsShare += l.points || 0;
+      existing.attPctSum += l.attendancePct || 0;
+      existing.tasksDone += l.tasksDone || 0;
+      existing.eventsDone += l.eventsDone || 0;
+      branchMap.set(b, existing);
+    }
+
+    if (branchMap.size === 0) {
+      return [];
+    }
+
+    const totalPoints = Array.from(branchMap.values()).reduce((sum, v) => sum + v.pointsShare, 0);
+
+    return Array.from(branchMap.entries()).map(([branch, stats]) => {
+      const avgAtt = stats.membersCount > 0 ? Math.round(stats.attPctSum / stats.membersCount) : attSummary.avgAttendancePct;
+      const pointsPct = totalPoints > 0 ? Math.round((stats.pointsShare / totalPoints) * 100) : 0;
+
+      return {
+        branch,
+        membersCount: stats.membersCount,
+        attendancePct: avgAtt,
+        tasksDone: stats.tasksDone,
+        eventsDone: stats.eventsDone,
+        pointsShare: stats.pointsShare,
+        growthPct: pointsPct,
+      };
+    });
   }
 
   /**
-   * 5. Club Growth Report
+   * 2. Club Growth Report — Pure Aggregation Layer
    */
-  public async getClubGrowthReport(): Promise<ClubGrowthRow[]> {
-    logger.info("[SemesterReportService] Generating Club Growth Report");
+  public async getClubGrowthReport(filters: any = {}): Promise<ClubGrowthRow[]> {
+    logger.info("[SemesterReportService] Aggregating Club Growth Report from domain services", filters);
 
-    return [
-      { semesterName: "ROBOTICS_B1_2026", academicYear: "2025-2026", members: 32, renewals: 28, attendancePct: 88.5, events: 5, tasks: 12, points: 2650, growthTrend: "↑ +18.5% Growth" },
-      { semesterName: "ROBOTICS_B2_2025", academicYear: "2024-2025", members: 27, renewals: 24, attendancePct: 84.2, events: 4, tasks: 9, points: 2100, growthTrend: "↑ +12.0% Growth" },
-      { semesterName: "ROBOTICS_B1_2025", academicYear: "2024-2025", members: 24, renewals: 20, attendancePct: 81.0, events: 3, tasks: 7, points: 1750, growthTrend: "→ Baseline" },
-    ];
+    const [attSummary, renData, ptsDist, taskSummary, events] = await Promise.all([
+      this.attReportService.getAttendanceSummaryReport(filters),
+      this.memReportService.getMembershipRenewalReport(filters),
+      this.ptsReportService.getPointsDistributionReport(filters),
+      this.opsReportService.getTaskCompletionSummary(filters),
+      this.opsReportService.getEventsReport(filters),
+    ]);
+
+    const activeSemRow: ClubGrowthRow = {
+      semesterName: filters.semester || "ROBOTICS_B1_2026",
+      academicYear: filters.academicYear || "2025-2026",
+      members: renData.currentMembersCount,
+      renewals: renData.renewedMembersCount,
+      attendancePct: attSummary.avgAttendancePct,
+      events: events.length,
+      tasks: taskSummary.completedTasks,
+      points: ptsDist.totalPoints,
+      growthTrend: `↑ +${Math.round(renData.currentMembersCount > 0 ? (renData.renewedMembersCount / renData.currentMembersCount) * 100 : 100)}% Enrollment Retention`,
+    };
+
+    return [activeSemRow];
   }
 }

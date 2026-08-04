@@ -446,6 +446,9 @@ export class ReportCenterService {
 
     if (reportId === "mem_3") {
       const rows = await this.memReportService.getMemberPerformanceReport(filters);
+      const avgAtt = rows.length === 0 ? 0 : Math.round(rows.reduce((sum, r) => sum + r.attendancePct, 0) / rows.length);
+      const topPts = rows.length === 0 ? 0 : rows[0].points;
+
       return {
         reportId,
         title: "Member Performance & Audit Profile",
@@ -454,8 +457,8 @@ export class ReportCenterService {
         filtersApplied: filters,
         kpis: [
           { label: "Total Evaluated", value: rows.length },
-          { label: "Highest Points", value: rows[0]?.points || 250, color: "text-emerald-400" },
-          { label: "Avg Attendance %", value: "88.2%" },
+          { label: "Highest Points", value: topPts, color: "text-emerald-400" },
+          { label: "Avg Attendance %", value: `${avgAtt}%` },
         ],
         columns: [
           { key: "rank", label: "Rank" },
@@ -474,6 +477,8 @@ export class ReportCenterService {
 
     if (reportId === "mem_4") {
       const rows = await this.memReportService.getMemberTimelineReport();
+      const latestTitle = rows.length === 0 ? "No activity recorded" : rows[0].title;
+
       return {
         reportId,
         title: "Member Activity Timeline Report",
@@ -482,10 +487,10 @@ export class ReportCenterService {
         filtersApplied: filters,
         kpis: [
           { label: "Timeline Milestones", value: rows.length },
-          { label: "Latest Activity", value: rows[0]?.title || "Smart Team Builder" },
+          { label: "Latest Activity", value: latestTitle },
         ],
         columns: [
-          { key: "date", label: "Date" },
+          { key: "timestamp", label: "Timestamp" },
           { key: "category", label: "Category" },
           { key: "title", label: "Activity Title" },
           { key: "description", label: "Details & Audit" },
@@ -689,6 +694,8 @@ export class ReportCenterService {
   private async getReportPreviewWave2(reportId: string, filters: any, generatedAt: string): Promise<ReportPreviewResult> {
     if (reportId === "ops_1") {
       const rows = await this.opsReportService.getTechnicalTaskReport(filters);
+      const avgComp = rows.length === 0 ? 0 : Math.round(rows.reduce((sum, r) => sum + r.completionPct, 0) / rows.length);
+
       return {
         reportId,
         title: "Technical Task Execution Report",
@@ -697,7 +704,7 @@ export class ReportCenterService {
         filtersApplied: filters,
         kpis: [
           { label: "Total Assigned Tasks", value: rows.length },
-          { label: "Avg Completion Rate", value: "82.5%", color: "text-emerald-400" },
+          { label: "Avg Completion Rate", value: `${avgComp}%`, color: "text-emerald-400" },
         ],
         columns: [
           { key: "taskName", label: "Task Name" },
@@ -787,6 +794,8 @@ export class ReportCenterService {
 
     if (reportId === "pts_1") {
       const rows = await this.ptsReportService.getLeaderboardReport(filters);
+      const topPts = rows.length === 0 ? 0 : rows[0].points;
+
       return {
         reportId,
         title: "Official Leaderboard Report",
@@ -795,7 +804,7 @@ export class ReportCenterService {
         filtersApplied: filters,
         kpis: [
           { label: "Ranked Members", value: rows.length },
-          { label: "Top Score", value: rows[0]?.points || 250, color: "text-emerald-400" },
+          { label: "Top Score", value: topPts, color: "text-emerald-400" },
         ],
         columns: [
           { key: "rank", label: "Rank" },
@@ -827,8 +836,8 @@ export class ReportCenterService {
           { key: "date", label: "Date" },
           { key: "memberName", label: "Member Name" },
           { key: "category", label: "Category" },
-          { key: "reference", label: "Reference" },
-          { key: "points", label: "Points", align: "right" },
+          { key: "referenceType", label: "Reference Type" },
+          { key: "formattedPoints", label: "Points", align: "right" },
           { key: "awardedBy", label: "Awarded By" },
           { key: "remarks", label: "Remarks" },
         ],
@@ -846,9 +855,9 @@ export class ReportCenterService {
         filtersApplied: filters,
         kpis: [
           { label: "Total Points Awarded", value: dist.totalPoints, color: "text-emerald-400" },
-          { label: "Attendance Points", value: dist.attendancePoints },
-          { label: "Task Points", value: dist.taskPoints },
-          { label: "Event Points", value: dist.eventPoints },
+          { label: "Avg Pts / Member", value: dist.avgPointsPerMember },
+          { label: "Highest Category", value: dist.highestCategory },
+          { label: "Distribution Trend", value: dist.distributionTrend },
         ],
         columns: [
           { key: "category", label: "Point Category" },
@@ -869,7 +878,7 @@ export class ReportCenterService {
         filtersApplied: filters,
         kpis: [
           { label: "Generations Run", value: rows.length },
-          { label: "Total Members Placed", value: rows.reduce((s, r) => s + r.membersIncluded, 0), color: "text-emerald-400" },
+          { label: "Total Members Placed", value: rows.reduce((s, r) => s + r.totalMembers, 0), color: "text-emerald-400" },
         ],
         columns: [
           { key: "attendanceSession", label: "Attendance Session" },
@@ -877,7 +886,7 @@ export class ReportCenterService {
           { key: "algorithm", label: "Algorithm" },
           { key: "teamSize", label: "Team Size", align: "center" },
           { key: "teamsCreated", label: "Teams Created", align: "center" },
-          { key: "membersIncluded", label: "Members Count", align: "right" },
+          { key: "totalMembers", label: "Members Count", align: "right" },
           { key: "generatedBy", label: "Generated By" },
         ],
         rows,
@@ -886,6 +895,8 @@ export class ReportCenterService {
 
     if (reportId === "ts_2") {
       const rows = await this.tsReportService.getCollaborationIntelligenceReport(filters);
+      const avgDiv = rows.length === 0 ? 0 : Math.round(rows.reduce((sum, r) => sum + r.collaborationDiversityPct, 0) / rows.length);
+
       return {
         reportId,
         title: "Collaboration Intelligence Audit Report",
@@ -894,7 +905,7 @@ export class ReportCenterService {
         filtersApplied: filters,
         kpis: [
           { label: "Evaluated Members", value: rows.length },
-          { label: "Avg Diversity Score", value: "91%", color: "text-emerald-400" },
+          { label: "Avg Diversity Score", value: `${avgDiv}%`, color: "text-emerald-400" },
         ],
         columns: [
           { key: "memberName", label: "Member Name" },
@@ -911,6 +922,8 @@ export class ReportCenterService {
 
     if (reportId === "ts_3") {
       const rows = await this.tsReportService.getTeamStudioTimelineReport(filters);
+      const latestAct = rows.length === 0 ? "No activities recorded" : rows[0].activity;
+
       return {
         reportId,
         title: "Team Studio Activity Center Timeline",
@@ -919,7 +932,7 @@ export class ReportCenterService {
         filtersApplied: filters,
         kpis: [
           { label: "Activity Log Entries", value: rows.length },
-          { label: "Latest Activity", value: rows[0]?.activity || "Member Shuffle" },
+          { label: "Latest Activity", value: latestAct },
         ],
         columns: [
           { key: "timestamp", label: "Timestamp" },

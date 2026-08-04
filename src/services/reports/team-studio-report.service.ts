@@ -3,12 +3,14 @@ import { logger } from "@/core/logger";
 
 export interface TeamGenerationReportRow {
   attendanceSession: string;
+  semester: string;
   generationTime: string;
+  generatedBy: string;
   algorithm: string;
   teamSize: number;
-  teamsCreated: number;
-  membersIncluded: number;
-  generatedBy: string;
+  totalTeams: number;
+  totalMembers: number;
+  avgTeamSize: number;
 }
 
 export interface CollaborationIntelligenceRow {
@@ -20,78 +22,184 @@ export interface CollaborationIntelligenceRow {
   mostFrequentCollaborator: string;
   repeatedPairings: number;
   collaborationDiversityPct: number;
+  neverWorkedWithCount: number;
 }
 
 export interface TeamStudioTimelineRow {
   timestamp: string;
+  session: string;
   activity: string;
   description: string;
   coordinator: string;
-  session: string;
+  affectedMembers: number;
+  algorithm: string;
 }
 
 export class TeamStudioReportService {
 
   /**
-   * 1. Team Generation Report
+   * 1. Team Generation Report — Live Database Query
    */
-  public async getTeamGenerationReport(filters: any): Promise<TeamGenerationReportRow[]> {
-    logger.info("[TeamStudioReportService] Generating Team Generation Report");
+  public async getTeamGenerationReport(filters: any = {}): Promise<TeamGenerationReportRow[]> {
+    logger.info("[TeamStudioReportService] Querying Team Generation Report from live database");
 
-    const { data: gens } = await supabase
+    const { data: gens, error } = await supabase
       .from("team_generations")
       .select("id, algorithm, team_size, total_teams, total_members, generated_by, created_at, attendance_sessions(title)")
       .order("created_at", { ascending: false });
 
-    return (gens || []).map((g: any) => {
+    if (error || !gens || gens.length === 0) {
+      return [];
+    }
+
+    let rows: TeamGenerationReportRow[] = gens.map((g: any) => {
       const sess = Array.isArray(g.attendance_sessions) ? g.attendance_sessions[0] : g.attendance_sessions;
+      const teamSize = g.team_size || 4;
+      const totalTeams = g.total_teams || 1;
+      const totalMembers = g.total_members || 0;
+      const avgSize = totalTeams > 0 ? Math.round((totalMembers / totalTeams) * 10) / 10 : teamSize;
+
+      let algoTitle = "Smart Collaboration Engine";
+      const alg = (g.algorithm || "").toLowerCase();
+      if (alg.includes("branch") || alg.includes("balance")) algoTitle = "Balanced Branch & Year";
+      else if (alg.includes("random")) algoTitle = "Random Team Builder";
+
+      const genTimeStr = g.created_at ? new Date(g.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "N/A";
+
       return {
-        attendanceSession: sess?.title || "Robotics Workshop Live",
-        generationTime: g.created_at ? new Date(g.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "Today, 16:15 PM",
-        algorithm: g.algorithm === "smart_collaboration" ? "Smart Collaboration Engine" : "Balanced Branch",
-        teamSize: g.team_size || 4,
-        teamsCreated: g.total_teams || 8,
-        membersIncluded: g.total_members || 32,
+        attendanceSession: sess?.title || "Team Studio Session",
+        semester: "ROBOTICS_B1_2026",
+        generationTime: genTimeStr,
         generatedBy: g.generated_by || "Faculty Coordinator",
+        algorithm: algoTitle,
+        teamSize,
+        totalTeams,
+        totalMembers,
+        avgTeamSize: avgSize,
+      };
+    });
+
+    return rows;
+  }
+
+  /**
+   * 2. Collaboration Intelligence Report — Live Matrix Calculation
+   */
+  public async getCollaborationIntelligenceReport(filters: any = {}): Promise<CollaborationIntelligenceRow[]> {
+    logger.info("[TeamStudioReportService] Calculating Collaboration Intelligence Report from live database");
+
+    const [memsRes, collabRes] = await Promise.all([
+      supabase.from("members").select("id, name, member_id, club_membership_id, branch, year").eq("status", "active").is("deleted_at", null),
+      supabase.from("member_collaborations").select("member_a_id, member_b_id, times_worked_together"),
+    ]);
+
+    const members = memsRes.data || [];
+    const collabs = collabRes.data || [];
+
+    if (members.length === 0) {
+      return [];
+    }
+
+    let filteredMembers = members;
+    if (filters.branch && filters.branch !== "all") {
+      filteredMembers = filteredMembers.filter((m: any) => m.branch && m.branch.toLowerCase() === filters.branch.toLowerCase());
+    }
+    if (filters.year && filters.year !== "all") {
+      filteredMembers = filteredMembers.filter((m: any) => String(m.year) === String(filters.year));
+    }
+
+    const memberMap = new Map<string, string>();
+    members.forEach((m: any) => memberMap.set(m.id, m.name));
+
+    // Map partner stats per member ID: partnerId -> times
+    const partnerMap = new Map<string, Map<string, number>>();
+
+    for (const c of collabs) {
+      const a = c.member_a_id;
+      const b = c.member_b_id;
+      const times = c.times_worked_together || 1;
+
+      // A -> B
+      const aMap = partnerMap.get(a) || new Map<string, number>();
+      aMap.set(b, (aMap.get(b) || 0) + times);
+      partnerMap.set(a, aMap);
+
+      // B -> A
+      const bMap = partnerMap.get(b) || new Map<string, number>();
+      bMap.set(a, (bMap.get(a) || 0) + times);
+      partnerMap.set(b, bMap);
+    }
+
+    const totalActiveCount = Math.max(1, members.length - 1);
+
+    return filteredMembers.map((m: any) => {
+      const pMap = partnerMap.get(m.id) || new Map<string, number>();
+      const uniqueCount = pMap.size;
+
+      let topPartnerName = "None Yet";
+      let topTimes = 0;
+      let repeatedPairings = 0;
+
+      for (const [pId, times] of pMap.entries()) {
+        if (times > 1) repeatedPairings++;
+        if (times > topTimes) {
+          topTimes = times;
+          const pName = memberMap.get(pId) || "Teammate";
+          topPartnerName = `${pName} (${times} times)`;
+        }
+      }
+
+      const diversityPct = Math.min(100, Math.round((uniqueCount / totalActiveCount) * 100));
+      const neverWorked = Math.max(0, totalActiveCount - uniqueCount);
+
+      return {
+        memberName: m.name || "Member",
+        membershipId: m.club_membership_id || m.member_id || "SAC-RC-0000",
+        branch: (m.branch || "ECE").toUpperCase(),
+        year: m.year || 1,
+        uniqueCollaborators: uniqueCount,
+        mostFrequentCollaborator: topPartnerName,
+        repeatedPairings,
+        collaborationDiversityPct: diversityPct,
+        neverWorkedWithCount: neverWorked,
       };
     });
   }
 
   /**
-   * 2. Collaboration Intelligence Report
+   * 3. Team Studio Activity Timeline Report — Live Chronological Log
    */
-  public async getCollaborationIntelligenceReport(filters: any): Promise<CollaborationIntelligenceRow[]> {
-    logger.info("[TeamStudioReportService] Generating Collaboration Intelligence Report");
+  public async getTeamStudioTimelineReport(filters: any = {}): Promise<TeamStudioTimelineRow[]> {
+    logger.info("[TeamStudioReportService] Building live Team Studio Activity Timeline Report");
 
-    const { data: members } = await supabase
-      .from("members")
-      .select("id, name, member_id, club_membership_id, branch, year")
-      .eq("status", "active")
-      .limit(15);
+    const { data: gens, error } = await supabase
+      .from("team_generations")
+      .select("id, algorithm, team_size, total_teams, total_members, generated_by, created_at, attendance_sessions(title)")
+      .order("created_at", { ascending: false })
+      .limit(50);
 
-    return (members || []).map((m: any, idx: number) => ({
-      memberName: m.name || "Member",
-      membershipId: m.club_membership_id || m.member_id || "SAC-RC-0000",
-      branch: (m.branch || "ECE").toUpperCase(),
-      year: m.year || 1,
-      uniqueCollaborators: 12 + (idx % 5),
-      mostFrequentCollaborator: idx % 2 === 0 ? "Ananya Patel (3 times)" : "Karthik Verma (2 times)",
-      repeatedPairings: idx % 3,
-      collaborationDiversityPct: 88 + (idx % 10),
-    }));
-  }
+    if (error || !gens || gens.length === 0) {
+      return [];
+    }
 
-  /**
-   * 3. Team Studio Activity Timeline Report
-   */
-  public async getTeamStudioTimelineReport(filters: any): Promise<TeamStudioTimelineRow[]> {
-    logger.info("[TeamStudioReportService] Generating Team Studio Activity Timeline Report");
+    return gens.map((g: any) => {
+      const sess = Array.isArray(g.attendance_sessions) ? g.attendance_sessions[0] : g.attendance_sessions;
+      const genTimeStr = g.created_at ? new Date(g.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "N/A";
 
-    return [
-      { timestamp: "Today, 16:30 PM", activity: "Member Shuffle", description: "Shuffled 32 enrolled members", coordinator: "Faculty Coordinator", session: "Robotics Live Session" },
-      { timestamp: "Today, 16:20 PM", activity: "Spin Wheel", description: "Wheel selected winner: Rohan Sharma", coordinator: "Faculty Coordinator", session: "Robotics Live Session" },
-      { timestamp: "Today, 16:15 PM", activity: "Team Generation", description: "Generated 8 teams using Smart Collaboration Engine", coordinator: "Faculty Coordinator", session: "Robotics Live Session" },
-      { timestamp: "Yesterday, 14:10 PM", activity: "Random Picker", description: "Picked 2 random members for presentation duty", coordinator: "Faculty Coordinator", session: "Sensors Lab #3" },
-    ];
+      let algoTitle = "Smart Collaboration Engine";
+      const alg = (g.algorithm || "").toLowerCase();
+      if (alg.includes("branch") || alg.includes("balance")) algoTitle = "Balanced Branch & Year";
+      else if (alg.includes("random")) algoTitle = "Random Team Builder";
+
+      return {
+        timestamp: genTimeStr,
+        session: sess?.title || "Live Attendance Session",
+        activity: "Team Generation",
+        description: `Generated ${g.total_teams || 1} teams for ${g.total_members || 0} members using ${algoTitle}`,
+        coordinator: g.generated_by || "Faculty Coordinator",
+        affectedMembers: g.total_members || 0,
+        algorithm: algoTitle,
+      };
+    });
   }
 }
