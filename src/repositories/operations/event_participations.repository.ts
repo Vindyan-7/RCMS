@@ -3,38 +3,66 @@
  */
 
 import { eq, and, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { db, supabase, toCamelCase, toSnakeCase } from "@/db";
 import { eventParticipations, EventParticipationSelect, EventParticipationInsert } from "@/db/schema";
 import { PaginatedResult } from "@/core/repository/repository.types";
 import { UUID, PaginationQuery } from "@/core/types";
+import { logger } from "@/core/logger";
 
 export class EventParticipationsRepository {
   public async findById(id: UUID): Promise<EventParticipationSelect | null> {
-    const result = await db
-      .select()
-      .from(eventParticipations)
-      .where(eq(eventParticipations.id, id))
-      .limit(1);
+    try {
+      const result = await db
+        .select()
+        .from(eventParticipations)
+        .where(eq(eventParticipations.id, id))
+        .limit(1);
 
-    return result[0] || null;
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[EventParticipationsRepository] Drizzle findById error", err);
+    }
+
+    try {
+      const { data } = await supabase.from("event_participations").select("*").eq("id", id).limit(1);
+      if (data && data[0]) return toCamelCase<EventParticipationSelect>(data[0]);
+    } catch {}
+
+    return null;
   }
 
   public async findByEventAndMember(
     eventId: UUID,
     memberId: UUID
   ): Promise<EventParticipationSelect | null> {
-    const result = await db
-      .select()
-      .from(eventParticipations)
-      .where(
-        and(
-          eq(eventParticipations.eventId, eventId),
-          eq(eventParticipations.memberId, memberId)
+    try {
+      const result = await db
+        .select()
+        .from(eventParticipations)
+        .where(
+          and(
+            eq(eventParticipations.eventId, eventId),
+            eq(eventParticipations.memberId, memberId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    return result[0] || null;
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[EventParticipationsRepository] Drizzle findByEventAndMember error", err);
+    }
+
+    try {
+      const { data } = await supabase
+        .from("event_participations")
+        .select("*")
+        .eq("event_id", eventId)
+        .eq("member_id", memberId)
+        .limit(1);
+      if (data && data[0]) return toCamelCase<EventParticipationSelect>(data[0]);
+    } catch {}
+
+    return null;
   }
 
   public async getByEventId(
@@ -42,32 +70,39 @@ export class EventParticipationsRepository {
     query: PaginationQuery
   ): Promise<PaginatedResult<EventParticipationSelect>> {
     const page = query.page || 1;
-    const limit = query.limit || 20;
+    const limit = query.limit || 1000;
     const offset = (page - 1) * limit;
 
-    const whereClause = eq(eventParticipations.eventId, eventId);
-
-    const [items, totalRes] = await Promise.all([
-      db
+    let items: EventParticipationSelect[] = [];
+    try {
+      items = await db
         .select()
         .from(eventParticipations)
-        .where(whereClause)
+        .where(eq(eventParticipations.eventId, eventId))
         .limit(limit)
-        .offset(offset),
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(eventParticipations)
-        .where(whereClause),
-    ]);
+        .offset(offset);
+    } catch (err) {
+      logger.error("[EventParticipationsRepository] Drizzle getByEventId error", err);
+    }
 
-    const total = Number(totalRes[0]?.count || 0);
+    if (items.length === 0) {
+      try {
+        const { data } = await supabase
+          .from("event_participations")
+          .select("*")
+          .eq("event_id", eventId);
+        if (data && data.length > 0) {
+          items = toCamelCase<EventParticipationSelect[]>(data);
+        }
+      } catch {}
+    }
 
     return {
       items,
-      total,
+      total: items.length,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.max(1, Math.ceil(items.length / limit)),
     };
   }
 
@@ -76,46 +111,80 @@ export class EventParticipationsRepository {
     query: PaginationQuery
   ): Promise<PaginatedResult<EventParticipationSelect>> {
     const page = query.page || 1;
-    const limit = query.limit || 20;
+    const limit = query.limit || 1000;
     const offset = (page - 1) * limit;
 
-    const whereClause = eq(eventParticipations.memberId, memberId);
-
-    const [items, totalRes] = await Promise.all([
-      db
+    let items: EventParticipationSelect[] = [];
+    try {
+      items = await db
         .select()
         .from(eventParticipations)
-        .where(whereClause)
+        .where(eq(eventParticipations.memberId, memberId))
         .limit(limit)
-        .offset(offset),
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(eventParticipations)
-        .where(whereClause),
-    ]);
+        .offset(offset);
+    } catch (err) {
+      logger.error("[EventParticipationsRepository] Drizzle getByMemberId error", err);
+    }
 
-    const total = Number(totalRes[0]?.count || 0);
+    if (items.length === 0) {
+      try {
+        const { data } = await supabase
+          .from("event_participations")
+          .select("*")
+          .eq("member_id", memberId);
+        if (data && data.length > 0) {
+          items = toCamelCase<EventParticipationSelect[]>(data);
+        }
+      } catch {}
+    }
 
     return {
       items,
-      total,
+      total: items.length,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.max(1, Math.ceil(items.length / limit)),
     };
   }
 
   public async create(data: EventParticipationInsert): Promise<EventParticipationSelect> {
-    const result = await db.insert(eventParticipations).values(data).returning();
-    return result[0];
+    try {
+      const result = await db.insert(eventParticipations).values(data).returning();
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[EventParticipationsRepository] Drizzle create error, falling back to REST API", err);
+    }
+
+    const snakePayload = toSnakeCase(data);
+    const { data: restResult, error } = await supabase
+      .from("event_participations")
+      .insert(snakePayload)
+      .select()
+      .single();
+
+    if (error || !restResult) {
+      throw new Error(`[EventParticipationsRepository] Create failed: ${error?.message}`);
+    }
+    return toCamelCase<EventParticipationSelect>(restResult);
   }
 
   public async delete(id: UUID): Promise<boolean> {
-    const result = await db
-      .delete(eventParticipations)
-      .where(eq(eventParticipations.id, id))
-      .returning();
+    try {
+      const result = await db
+        .delete(eventParticipations)
+        .where(eq(eventParticipations.id, id))
+        .returning();
 
-    return result.length > 0;
+      if (result.length > 0) return true;
+    } catch (err) {
+      logger.error("[EventParticipationsRepository] Drizzle delete error", err);
+    }
+
+    try {
+      const { error } = await supabase.from("event_participations").delete().eq("id", id);
+      return !error;
+    } catch {
+      return false;
+    }
   }
 }

@@ -3,7 +3,7 @@
  */
 
 import { eq, and, isNull, sql } from "drizzle-orm";
-import { db, supabase, toCamelCase } from "@/db";
+import { db, supabase, toCamelCase, toSnakeCase } from "@/db";
 import { events, EventSelect, EventInsert } from "@/db/schema";
 import { BaseRepository } from "@/core/repository/base-repository";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
@@ -100,8 +100,19 @@ export class EventsRepository extends BaseRepository<
       ...audit,
     };
 
-    const result = await db.insert(events).values(payload).returning();
-    return result[0];
+    try {
+      const result = await db.insert(events).values(payload).returning();
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[EventsRepository] Drizzle create error, falling back to REST API", err);
+    }
+
+    const snakePayload = toSnakeCase(payload);
+    const { data: restResult, error } = await supabase.from("events").insert(snakePayload).select().single();
+    if (error || !restResult) {
+      throw new Error(`[EventsRepository] Create failed: ${error?.message || "Unknown error"}`);
+    }
+    return toCamelCase<EventSelect>(restResult);
   }
 
   public async update(
@@ -115,49 +126,111 @@ export class EventsRepository extends BaseRepository<
       ...audit,
     };
 
-    const result = await db
-      .update(events)
-      .set(payload)
-      .where(and(eq(events.id, id), isNull(events.deletedAt)))
-      .returning();
+    try {
+      const result = await db
+        .update(events)
+        .set(payload)
+        .where(and(eq(events.id, id), isNull(events.deletedAt)))
+        .returning();
 
-    return result[0];
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[EventsRepository] Drizzle update error, falling back to REST API", err);
+    }
+
+    const snakePayload = toSnakeCase(payload);
+    const { data: restResult, error } = await supabase
+      .from("events")
+      .update(snakePayload)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error || !restResult) {
+      throw new Error(`[EventsRepository] Update failed: ${error?.message || "Unknown error"}`);
+    }
+    return toCamelCase<EventSelect>(restResult);
   }
 
   public async delete(id: UUID, deleterId: UUID): Promise<boolean> {
     const timestamp = new Date();
-    const result = await db
-      .update(events)
-      .set({
-        deletedAt: timestamp,
-        deletedBy: deleterId,
-        updatedAt: timestamp,
-        updatedBy: deleterId,
-      })
-      .where(and(eq(events.id, id), isNull(events.deletedAt)))
-      .returning();
+    try {
+      const result = await db
+        .update(events)
+        .set({
+          deletedAt: timestamp,
+          deletedBy: deleterId,
+          updatedAt: timestamp,
+          updatedBy: deleterId,
+        })
+        .where(and(eq(events.id, id), isNull(events.deletedAt)))
+        .returning();
 
-    return result.length > 0;
+      if (result.length > 0) return true;
+    } catch (err) {
+      logger.error("[EventsRepository] Drizzle delete error, falling back to REST API", err);
+    }
+
+    try {
+      const { error } = await supabase
+        .from("events")
+        .update({
+          deleted_at: timestamp.toISOString(),
+          deleted_by: deleterId,
+          updated_at: timestamp.toISOString(),
+          updated_by: deleterId,
+        })
+        .eq("id", id);
+      return !error;
+    } catch {
+      return false;
+    }
   }
 
   public async restore(id: UUID, restorerId: UUID): Promise<boolean> {
     const timestamp = new Date();
-    const result = await db
-      .update(events)
-      .set({
-        deletedAt: null,
-        deletedBy: null,
-        updatedAt: timestamp,
-        updatedBy: restorerId,
-      })
-      .where(eq(events.id, id))
-      .returning();
+    try {
+      const result = await db
+        .update(events)
+        .set({
+          deletedAt: null,
+          deletedBy: null,
+          updatedAt: timestamp,
+          updatedBy: restorerId,
+        })
+        .where(eq(events.id, id))
+        .returning();
 
-    return result.length > 0;
+      if (result.length > 0) return true;
+    } catch {}
+
+    try {
+      const { error } = await supabase
+        .from("events")
+        .update({
+          deleted_at: null,
+          deleted_by: null,
+          updated_at: timestamp.toISOString(),
+          updated_by: restorerId,
+        })
+        .eq("id", id);
+      return !error;
+    } catch {
+      return false;
+    }
   }
 
   public async purge(id: UUID): Promise<boolean> {
-    const result = await db.delete(events).where(eq(events.id, id)).returning();
-    return result.length > 0;
+    try {
+      const result = await db.delete(events).where(eq(events.id, id)).returning();
+      if (result.length > 0) return true;
+    } catch {}
+
+    try {
+      const { error } = await supabase.from("events").delete().eq("id", id);
+      return !error;
+    } catch {
+      return false;
+    }
   }
 }
