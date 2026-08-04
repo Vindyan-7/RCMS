@@ -1,9 +1,10 @@
 /**
- * Attendance Domain - Attendance Sessions Repository
+ * Attendance Domain - Attendance Sessions Repository Implementation
+ * Serverless REST execution support added to prevent getaddrinfo ENOTFOUND on Vercel
  */
 
 import { eq, and, isNull, sql } from "drizzle-orm";
-import { db, supabase, toCamelCase, isServerless } from "@/db";
+import { db, supabase, toCamelCase, toSnakeCase, isServerless } from "@/db";
 import { attendanceSessions, AttendanceSessionSelect, AttendanceSessionInsert } from "@/db/schema";
 import { BaseRepository } from "@/core/repository/base-repository";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
@@ -23,12 +24,25 @@ export class AttendanceSessionsRepository extends BaseRepository<
     id: UUID,
     options?: { includeDeleted?: boolean }
   ): Promise<AttendanceSessionSelect | null> {
-    const conditions = [eq(attendanceSessions.id, id)];
-    if (!options?.includeDeleted) {
-      conditions.push(isNull(attendanceSessions.deletedAt));
+    if (isServerless) {
+      try {
+        let query = supabase.from("attendance_sessions").select("*").eq("id", id);
+        if (!options?.includeDeleted) {
+          query = query.is("deleted_at", null);
+        }
+        const { data } = await query.limit(1);
+        if (data && data[0]) return toCamelCase<AttendanceSessionSelect>(data[0]);
+      } catch (err) {
+        logger.error("[AttendanceSessionsRepository] REST findById error", err);
+      }
     }
 
     try {
+      const conditions = [eq(attendanceSessions.id, id)];
+      if (!options?.includeDeleted) {
+        conditions.push(isNull(attendanceSessions.deletedAt));
+      }
+
       const result = await db
         .select()
         .from(attendanceSessions)
@@ -41,7 +55,11 @@ export class AttendanceSessionsRepository extends BaseRepository<
     }
 
     try {
-      const { data } = await supabase.from("attendance_sessions").select("*").eq("id", id).limit(1);
+      let query = supabase.from("attendance_sessions").select("*").eq("id", id);
+      if (!options?.includeDeleted) {
+        query = query.is("deleted_at", null);
+      }
+      const { data } = await query.limit(1);
       if (data && data[0]) return toCamelCase<AttendanceSessionSelect>(data[0]);
     } catch {}
 
@@ -114,8 +132,44 @@ export class AttendanceSessionsRepository extends BaseRepository<
       ...audit,
     };
 
-    const result = await db.insert(attendanceSessions).values(payload).returning();
-    return result[0];
+    if (isServerless) {
+      try {
+        const snakePayload = toSnakeCase(payload);
+        const { data: inserted, error } = await supabase
+          .from("attendance_sessions")
+          .insert(snakePayload)
+          .select()
+          .single();
+
+        if (!error && inserted) {
+          return toCamelCase<AttendanceSessionSelect>(inserted);
+        } else if (error) {
+          logger.error("[AttendanceSessionsRepository] REST create error response", error);
+        }
+      } catch (err) {
+        logger.error("[AttendanceSessionsRepository] REST create exception", err);
+      }
+    }
+
+    try {
+      const result = await db.insert(attendanceSessions).values(payload).returning();
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[AttendanceSessionsRepository] Drizzle create error", err);
+    }
+
+    const snakePayload = toSnakeCase(payload);
+    const { data: inserted, error } = await supabase
+      .from("attendance_sessions")
+      .insert(snakePayload)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to create attendance session: ${error.message}`);
+    }
+
+    return toCamelCase<AttendanceSessionSelect>(inserted);
   }
 
   public async update(
@@ -129,29 +183,92 @@ export class AttendanceSessionsRepository extends BaseRepository<
       ...audit,
     };
 
-    const result = await db
-      .update(attendanceSessions)
-      .set(payload)
-      .where(and(eq(attendanceSessions.id, id), isNull(attendanceSessions.deletedAt)))
-      .returning();
+    if (isServerless) {
+      try {
+        const snakePayload = toSnakeCase(payload);
+        const { data: updated, error } = await supabase
+          .from("attendance_sessions")
+          .update(snakePayload)
+          .eq("id", id)
+          .is("deleted_at", null)
+          .select()
+          .single();
 
-    return result[0];
+        if (!error && updated) {
+          return toCamelCase<AttendanceSessionSelect>(updated);
+        } else if (error) {
+          logger.error("[AttendanceSessionsRepository] REST update error response", error);
+        }
+      } catch (err) {
+        logger.error("[AttendanceSessionsRepository] REST update exception", err);
+      }
+    }
+
+    try {
+      const result = await db
+        .update(attendanceSessions)
+        .set(payload)
+        .where(and(eq(attendanceSessions.id, id), isNull(attendanceSessions.deletedAt)))
+        .returning();
+
+      if (result[0]) return result[0];
+    } catch (err) {
+      logger.error("[AttendanceSessionsRepository] Drizzle update error", err);
+    }
+
+    const snakePayload = toSnakeCase(payload);
+    const { data: updated, error } = await supabase
+      .from("attendance_sessions")
+      .update(snakePayload)
+      .eq("id", id)
+      .is("deleted_at", null)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to update attendance session: ${error.message}`);
+    }
+
+    return toCamelCase<AttendanceSessionSelect>(updated);
   }
 
   public async delete(id: UUID, deleterId: UUID): Promise<boolean> {
     const timestamp = new Date();
-    const result = await db
-      .update(attendanceSessions)
-      .set({
-        deletedAt: timestamp,
-        deletedBy: deleterId,
-        updatedAt: timestamp,
-        updatedBy: deleterId,
-      })
-      .where(and(eq(attendanceSessions.id, id), isNull(attendanceSessions.deletedAt)))
-      .returning();
+    if (isServerless) {
+      try {
+        const { error } = await supabase
+          .from("attendance_sessions")
+          .update({
+            deleted_at: timestamp.toISOString(),
+            deleted_by: deleterId,
+            updated_at: timestamp.toISOString(),
+            updated_by: deleterId,
+          })
+          .eq("id", id);
 
-    return result.length > 0;
+        if (!error) return true;
+      } catch (err) {
+        logger.error("[AttendanceSessionsRepository] REST delete error", err);
+      }
+    }
+
+    try {
+      const result = await db
+        .update(attendanceSessions)
+        .set({
+          deletedAt: timestamp,
+          deletedBy: deleterId,
+          updatedAt: timestamp,
+          updatedBy: deleterId,
+        })
+        .where(and(eq(attendanceSessions.id, id), isNull(attendanceSessions.deletedAt)))
+        .returning();
+
+      return result.length > 0;
+    } catch (err) {
+      logger.error("[AttendanceSessionsRepository] Drizzle delete error", err);
+      return false;
+    }
   }
 
   public async restore(id: UUID, restorerId: UUID): Promise<boolean> {

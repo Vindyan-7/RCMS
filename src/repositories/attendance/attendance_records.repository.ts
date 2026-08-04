@@ -150,6 +150,25 @@ export class AttendanceRecordsRepository {
   public async create(data: AttendanceRecordInsert): Promise<AttendanceRecordSelect> {
     const payload: any = { ...data };
 
+    if (isServerless) {
+      try {
+        const snakePayload = toSnakeCase(payload);
+        const { data: restResult, error } = await supabase
+          .from("attendance_records")
+          .insert(snakePayload)
+          .select()
+          .single();
+
+        if (!error && restResult) {
+          return toCamelCase<AttendanceRecordSelect>(restResult);
+        } else if (error) {
+          logger.error("[AttendanceRecordsRepository] REST create error response", error);
+        }
+      } catch (err) {
+        logger.error("[AttendanceRecordsRepository] REST create exception", err);
+      }
+    }
+
     try {
       const result = await db.insert(attendanceRecords).values(payload).returning();
       if (result[0]) return result[0];
