@@ -6,6 +6,7 @@
  */
 
 import { useState, useTransition, useMemo } from "react";
+import { RCMS_BRANCHES } from "@/constants/branches";
 import {
   getTeamStudioInitialDataAction,
   generateTeamsAction,
@@ -768,12 +769,10 @@ export function TeamStudioClient({ initialData }: TeamStudioClientProps) {
                 onChange={(e) => setBranchFilter(e.target.value)}
                 className="bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm"
               >
-                <option value="all">All Branches (ECE, CSE, EEE...)</option>
-                <option value="ECE">ECE</option>
-                <option value="CSE">CSE</option>
-                <option value="EEE">EEE</option>
-                <option value="MECH">MECH</option>
-                <option value="CIVIL">CIVIL</option>
+                <option value="all">All Branches</option>
+                {RCMS_BRANCHES.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
               </select>
 
               <select
@@ -1333,7 +1332,7 @@ export function TeamStudioClient({ initialData }: TeamStudioClientProps) {
                     className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-xs text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
                   >
                     <option value="smart_collaboration">(Recommended) Smart Collaboration Engine</option>
-                    <option value="balanced_branch">Balanced Branch Distribution (ECE, CSE, EEE, MECH)</option>
+                    <option value="balanced_branch">Balanced Branch Distribution (CSE, CSM, ECE...)</option>
                     <option value="balanced_year">Balanced Academic Year Distribution (Yr 1 - Yr 4)</option>
                     <option value="random">Pure Random Distribution</option>
                   </select>

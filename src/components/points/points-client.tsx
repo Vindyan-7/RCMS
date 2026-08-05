@@ -12,6 +12,7 @@
  */
 
 import { useState, useTransition, useCallback, useEffect } from "react";
+import { RCMS_BRANCHES } from "@/constants/branches";
 import {
   awardPointsAction,
   deductPointsAction,
@@ -535,9 +536,9 @@ export function PointsClient({ initialLeaderboard, initialTasks = [] }: PointsCl
               )}
               <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)} className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground focus:outline-none">
                 <option value="all">Branch: All</option>
-                <option value="cse">CSE</option>
-                <option value="ece">ECE</option>
-                <option value="mech">MECH</option>
+                {RCMS_BRANCHES.map((b) => (
+                  <option key={b} value={b.toLowerCase()}>{b}</option>
+                ))}
               </select>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { supabase } from "@/db";
 import { logger } from "@/core/logger";
+import { normalizeBranch } from "@/constants/branches";
 
 export interface AttendanceRegisterRow {
   sessionTitle: string;
@@ -111,7 +112,7 @@ export class AttendanceReportService {
         memberName: mem?.name || "Member",
         membershipId: mem?.club_membership_id || mem?.member_id || "SAC-RC-0000",
         rollNumber: mem?.roll_number || "N/A",
-        branch: (mem?.branch || "ECE").toUpperCase(),
+        branch: normalizeBranch(mem?.branch),
         year: mem?.year || 1,
         status: r.late ? "Late" : "Present",
         lateMinutes: r.late ? 15 : 0,
@@ -206,7 +207,7 @@ export class AttendanceReportService {
         memberId: m.id,
         memberName: m.name || "Member",
         membershipId: m.club_membership_id || m.member_id || "SAC-RC-0000",
-        branch: (m.branch || "ECE").toUpperCase(),
+        branch: normalizeBranch(m.branch),
         year: m.year || 1,
         sessionsAttended: attended,
         attendancePct: pct,

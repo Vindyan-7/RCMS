@@ -1,4 +1,5 @@
 import { logger } from "@/core/logger";
+import { normalizeBranch } from "@/constants/branches";
 import { AttendanceReportService } from "./attendance-report.service";
 import { MemberReportService } from "./member-report.service";
 import { PointsReportService } from "./points-report.service";
@@ -53,9 +54,9 @@ export class SemesterReportService {
       { membersCount: number; attPctSum: number; tasksDone: number; eventsDone: number; pointsShare: number }
     >();
 
-    // Aggregate members count & branch breakdown
+    // Aggregate members count & branch breakdown (Single Source of Truth: normalizeBranch)
     for (const m of memDirectory) {
-      const b = (m.branch || "OTHER").toUpperCase();
+      const b = normalizeBranch(m.branch);
       const existing = branchMap.get(b) || { membersCount: 0, attPctSum: 0, tasksDone: 0, eventsDone: 0, pointsShare: 0 };
       existing.membersCount++;
       branchMap.set(b, existing);
@@ -63,7 +64,7 @@ export class SemesterReportService {
 
     // Aggregate points & attendance from Leaderboard
     for (const l of leaderboard) {
-      const b = (l.branch || "OTHER").toUpperCase();
+      const b = normalizeBranch(l.branch);
       const existing = branchMap.get(b) || { membersCount: 1, attPctSum: 0, tasksDone: 0, eventsDone: 0, pointsShare: 0 };
       existing.pointsShare += l.points || 0;
       existing.attPctSum += l.attendancePct || 0;

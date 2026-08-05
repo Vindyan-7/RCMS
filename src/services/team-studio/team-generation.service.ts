@@ -1,5 +1,6 @@
 import { supabase } from "@/db";
 import { logger } from "@/core/logger";
+import { normalizeBranch } from "@/constants/branches";
 import { PresentMemberItem } from "./team-studio.service";
 
 export type TeamAlgorithm = "smart_collaboration" | "balanced_branch" | "balanced_year" | "random";
@@ -122,7 +123,7 @@ export class TeamGenerationService {
           memberId: m.id,
           name: m.name || "Member",
           membershipId: m.club_membership_id || m.member_id || "SAC-RC-0000",
-          branch: (m.branch || "ECE").toUpperCase(),
+          branch: normalizeBranch(m.branch),
           year: m.year || 1,
         }));
       }

@@ -5,18 +5,20 @@
 
 import { db } from "@/db";
 
+import { RCMS_BRANCHES } from "@/constants/branches";
+
 export const OFFICIAL_BRANCHES = [
-  { code: "ECE", name: "Electronics and Communication Engineering" },
   { code: "CSE", name: "Computer Science and Engineering" },
+  { code: "CSM", name: "Computer Science and Engineering (AI & ML)" },
+  { code: "CSD", name: "Computer Science and Engineering (Data Science)" },
   { code: "CSC", name: "Computer Science and Engineering (Cyber Security)" },
-  { code: "CSM", name: "Computer Science and Engineering (Artificial Intelligence & Machine Learning)" },
-  { code: "EEE", name: "Electrical and Electronics Engineering" },
-  { code: "AIML", name: "Artificial Intelligence and Machine Learning" },
-  { code: "AIDS", name: "Artificial Intelligence and Data Science" },
   { code: "IT", name: "Information Technology" },
-  { code: "MECH", name: "Mechanical Engineering" },
-  { code: "CIVIL", name: "Civil Engineering" },
-  { code: "OTHER", name: "Other Department / General" },
+  { code: "ECE", name: "Electronics and Communication Engineering" },
+  { code: "EEE", name: "Electrical and Electronics Engineering" },
+  { code: "MEC", name: "Mechanical Engineering" },
+  { code: "Civil", name: "Civil Engineering" },
+  { code: "MBA", name: "Master of Business Administration" },
+  { code: "MCA", name: "Master of Computer Applications" },
 ];
 
 export async function seedOfficialBranches() {

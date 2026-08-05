@@ -1,5 +1,6 @@
 import { supabase } from "@/db";
 import { logger } from "@/core/logger";
+import { normalizeBranch } from "@/constants/branches";
 
 export interface LeaderboardReportRow {
   rank: number;
@@ -137,7 +138,7 @@ export class PointsReportService {
         rank: 1,
         memberName: m.name || "Member",
         membershipId: m.club_membership_id || m.member_id || "SAC-RC-0000",
-        branch: (m.branch || "ECE").toUpperCase(),
+        branch: normalizeBranch(m.branch),
         year: m.year || 1,
         academicYear: m.academic_year || "2025-2026",
         currentSemester: "ROBOTICS_B1_2026",

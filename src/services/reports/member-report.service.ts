@@ -1,5 +1,6 @@
 import { supabase } from "@/db";
 import { logger } from "@/core/logger";
+import { normalizeBranch } from "@/constants/branches";
 
 export interface MemberDirectoryRow {
   membershipId: string;
@@ -90,7 +91,7 @@ export class MemberReportService {
         membershipId: m.club_membership_id || m.member_id || "SAC-RC-0000",
         name: m.name || "Member",
         rollNumber: m.roll_number || "N/A",
-        branch: (m.branch || "ECE").toUpperCase(),
+        branch: normalizeBranch(m.branch),
         year: m.year || 1,
         academicYear: m.academic_year || "2025-2026",
         status: statusUpper,
@@ -161,7 +162,7 @@ export class MemberReportService {
       return {
         memberName: m.name || "Member",
         membershipId: m.club_membership_id || m.member_id || "SAC-RC-0000",
-        branch: (m.branch || "ECE").toUpperCase(),
+        branch: normalizeBranch(m.branch),
         year: m.year || 1,
         currentSemester: "ROBOTICS_B1_2026",
         renewalStatus,
@@ -277,7 +278,7 @@ export class MemberReportService {
         rank: 1,
         membershipId: m.club_membership_id || m.member_id || "SAC-RC-0000",
         name: m.name || "Member",
-        branch: (m.branch || "ECE").toUpperCase(),
+        branch: normalizeBranch(m.branch),
         year: m.year || 1,
         attendancePct: attPct,
         points: pts.total,

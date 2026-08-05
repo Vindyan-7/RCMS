@@ -6,6 +6,7 @@
  */
 
 import { ApiResponse, PaginationQuery } from "@/core/types";
+import { normalizeBranch } from "@/constants/branches";
 import { MemberSelect } from "@/db/schema";
 import { MembersRepository } from "@/repositories/members/members.repository";
 import { MembershipsRepository } from "@/repositories/members/memberships.repository";
@@ -212,7 +213,7 @@ export async function importMembersCsvAction(
       const digits = rawPhone.replace(/\D/g, "").slice(-10);
       const phone = digits.length === 10 && /^[6-9]/.test(digits) ? digits : "9000000000";
 
-      const branch = (record["branch"] || cols[4] || "ECE").toUpperCase();
+      const branch = normalizeBranch(record["branch"] || cols[4]);
       const year = Math.min(4, Math.max(1, Number(record["year"] || cols[5]) || 1));
       
       const rawGender = (record["gender"] || cols[6] || "other").toLowerCase();
@@ -571,7 +572,7 @@ export async function exportMemberFullProfileCsvAction(memberId: string): Promis
       member.clubMembershipId || member.memberId || "—",
       member.memberId || "—",
       member.rollNumber,
-      member.branch || "ECE",
+      normalizeBranch(member.branch),
       `Yr ${member.year || 1}`,
       member.email,
       member.phone,

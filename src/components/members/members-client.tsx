@@ -6,6 +6,7 @@
  */
 
 import { useState, useRef, useTransition, useEffect, useCallback } from "react";
+import { RCMS_BRANCHES } from "@/constants/branches";
 import {
   registerMemberAction,
   updateMemberAction,
@@ -379,11 +380,9 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
             className="rounded-xl border border-input bg-background px-3 py-2 text-xs text-foreground focus:outline-none"
           >
             <option value="all">Branch: All</option>
-            <option value="CSE">CSE</option>
-            <option value="ECE">ECE</option>
-            <option value="EEE">EEE</option>
-            <option value="MECH">MECH</option>
-            <option value="CIVIL">CIVIL</option>
+            {RCMS_BRANCHES.map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
           </select>
 
           <select
@@ -1108,11 +1107,9 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
                 <div>
                   <label className="font-semibold block mb-1">Branch *</label>
                   <select value={branch} onChange={(e) => setBranch(e.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs">
-                    <option value="ECE">ECE</option>
-                    <option value="CSE">CSE</option>
-                    <option value="EEE">EEE</option>
-                    <option value="MECH">MECH</option>
-                    <option value="CIVIL">CIVIL</option>
+                    {RCMS_BRANCHES.map((b) => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -1177,11 +1174,9 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
                 <div>
                   <label className="font-semibold block mb-1">Branch *</label>
                   <select value={branch} onChange={(e) => setBranch(e.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs">
-                    <option value="ECE">ECE</option>
-                    <option value="CSE">CSE</option>
-                    <option value="EEE">EEE</option>
-                    <option value="MECH">MECH</option>
-                    <option value="CIVIL">CIVIL</option>
+                    {RCMS_BRANCHES.map((b) => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
                   </select>
                 </div>
               </div>

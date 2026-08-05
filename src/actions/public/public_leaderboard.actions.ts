@@ -5,6 +5,7 @@
 
 import { supabase, isServerless, toCamelCase } from "@/db";
 import { logger } from "@/core/logger";
+import { normalizeBranch } from "@/constants/branches";
 
 export interface PublicLeaderboardItem {
   rank: number;
@@ -16,21 +17,25 @@ export interface PublicLeaderboardItem {
   tasksCompleted: number; // count
 }
 
-function deriveBranch(rollNumber: string | null, rawBranch: string | null): string {
+function deriveBranch(rawBranch?: string | null, rollNumber?: string | null): string {
   if (rawBranch && rawBranch.trim().length > 0) {
-    return rawBranch.trim().toUpperCase();
+    return normalizeBranch(rawBranch);
   }
-  if (!rollNumber) return "ROBOTICS";
+  if (!rollNumber) return "CSE";
 
   const upper = rollNumber.toUpperCase();
   if (upper.includes("A05") || upper.includes("CSE")) return "CSE";
+  if (upper.includes("A66") || upper.includes("AIML") || upper.includes("CSM")) return "CSM";
+  if (upper.includes("A67") || upper.includes("CSD")) return "CSD";
+  if (upper.includes("A62") || upper.includes("CSC")) return "CSC";
+  if (upper.includes("A12") || upper.includes("IT")) return "IT";
   if (upper.includes("A04") || upper.includes("ECE")) return "ECE";
   if (upper.includes("A02") || upper.includes("EEE")) return "EEE";
-  if (upper.includes("A03") || upper.includes("MECH")) return "MECH";
-  if (upper.includes("A01") || upper.includes("CIVIL")) return "CIVIL";
-  if (upper.includes("A12") || upper.includes("IT")) return "IT";
-  if (upper.includes("A66") || upper.includes("AIML") || upper.includes("CSM")) return "AI/ML";
-  return "ECE";
+  if (upper.includes("A03") || upper.includes("MEC") || upper.includes("MECH")) return "MEC";
+  if (upper.includes("A01") || upper.includes("CIVIL")) return "Civil";
+  if (upper.includes("MBA")) return "MBA";
+  if (upper.includes("MCA")) return "MCA";
+  return normalizeBranch(rawBranch);
 }
 
 export async function getPublicLeaderboardAction(): Promise<{

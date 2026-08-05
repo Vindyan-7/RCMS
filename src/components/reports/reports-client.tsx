@@ -6,6 +6,7 @@
  */
 
 import { useState, useMemo } from "react";
+import { RCMS_BRANCHES } from "@/constants/branches";
 import { generateReportPreviewAction } from "@/actions/reports/reports.actions";
 import { ReportCenterInitialResponse, ReportCategoryItem, ReportPreviewResult, RecentReportItem } from "@/services/reports/report-center.service";
 import { ReportExportService } from "@/services/reports/report-export.service";
@@ -276,12 +277,10 @@ export function ReportsClient({ initialData }: ReportsClientProps) {
               onChange={(e) => setBranchFilter(e.target.value)}
               className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:ring-2 focus:ring-primary shadow-sm"
             >
-              <option value="all">All Branches (ECE, CSE...)</option>
-              <option value="ECE">ECE</option>
-              <option value="CSE">CSE</option>
-              <option value="EEE">EEE</option>
-              <option value="MECH">MECH</option>
-              <option value="CIVIL">CIVIL</option>
+              <option value="all">All Branches</option>
+              {RCMS_BRANCHES.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
             </select>
           </div>
 

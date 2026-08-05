@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { RCMS_BRANCHES } from "@/constants/branches";
 import { PublicLeaderboardItem } from "@/actions/public/public_leaderboard.actions";
 import { Trophy, Search, Filter, Award, CheckCircle2, Calendar, ShieldAlert } from "lucide-react";
 
@@ -66,12 +67,9 @@ export function PublicLeaderboardClient({ initialLeaderboard }: PublicLeaderboar
             className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none"
           >
             <option value="all">All Branches</option>
-            <option value="ECE">ECE</option>
-            <option value="CSE">CSE</option>
-            <option value="EEE">EEE</option>
-            <option value="MECH">MECH</option>
-            <option value="CIVIL">CIVIL</option>
-            <option value="AI/ML">AI/ML</option>
+            {RCMS_BRANCHES.map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
           </select>
         </div>
       </div>

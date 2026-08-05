@@ -1,5 +1,6 @@
 import { supabase } from "@/db";
 import { logger } from "@/core/logger";
+import { RCMS_BRANCHES, normalizeBranch } from "@/constants/branches";
 
 export interface AnalyticsDashboardResponse {
   executive: {
@@ -155,12 +156,16 @@ export class AnalyticsDashboardService {
     const renewalRate = totalRegistered === 0 ? 0 : Math.round((renewedMembersCount / totalRegistered) * 100);
     const retentionRate = totalRegistered === 0 ? 0 : Math.round((activeMembersCount / totalRegistered) * 100);
 
-    // Branch & Year Distribution
-    const branchDistribution: Record<string, number> = { ECE: 0, CSE: 0, EEE: 0, MECH: 0, CIVIL: 0 };
+    // Branch & Year Distribution (Single Source of Truth: RCMS_BRANCHES)
+    const branchDistribution: Record<string, number> = {};
+    RCMS_BRANCHES.forEach((b) => {
+      branchDistribution[b] = 0;
+    });
+
     const yearDistribution: Record<string, number> = { "Yr 1": 0, "Yr 2": 0, "Yr 3": 0, "Yr 4": 0 };
 
     allMembers.forEach((m: any) => {
-      const b = (m.branch || "ECE").toUpperCase();
+      const b = normalizeBranch(m.branch);
       branchDistribution[b] = (branchDistribution[b] || 0) + 1;
 
       const yKey = `Yr ${m.year || 1}`;
