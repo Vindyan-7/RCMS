@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { RCMS_BRANCHES } from "@/constants/branches";
+import { RCMS_BRANCHES, normalizeBranch } from "@/constants/branches";
 import { PublicLeaderboardItem } from "@/actions/public/public_leaderboard.actions";
 import { Trophy, Search, Filter, Award, CheckCircle2, Calendar, ShieldAlert } from "lucide-react";
 
@@ -19,7 +19,8 @@ export function PublicLeaderboardClient({ initialLeaderboard }: PublicLeaderboar
       item.membershipId.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesBranch =
-      branchFilter === "all" || item.branch.toLowerCase() === branchFilter.toLowerCase();
+      branchFilter === "all" ||
+      normalizeBranch(item.branch).toLowerCase() === normalizeBranch(branchFilter).toLowerCase();
 
     return matchesSearch && matchesBranch;
   });

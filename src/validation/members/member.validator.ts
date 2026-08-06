@@ -18,11 +18,15 @@ export const createMemberSchema = z.object({
   phone: phoneSchema,
   rollNumber: rollNumberSchema,
   memberId: memberIdSchema.optional(),
-  gender: z.enum(["male", "female", "other", "prefer_not_to_say"]).optional(),
-  photoUrl: z.string().url("Invalid photo URL format").optional().nullable(),
+  clubMembershipId: z.string().optional().nullable(),
+  branch: z.string().optional().nullable(),
   branchId: uuidSchema.optional().nullable(),
   year: z.number().int().min(1).max(4).optional().nullable(),
-  status: z.enum(["active", "inactive", "alumni", "suspended"]).default("active").optional(),
+  gender: z.string().optional().nullable(),
+  role: z.string().optional().nullable(),
+  status: z.enum(["active", "inactive", "alumni", "suspended"]).optional(),
+  photoUrl: z.string().url("Invalid photo URL format").optional().nullable(),
+  avatarUrl: z.string().optional().nullable(),
 });
 
 export const updateMemberSchema = createMemberSchema.partial();

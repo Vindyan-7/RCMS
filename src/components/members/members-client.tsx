@@ -5,8 +5,9 @@
  * Production Polish: Quick Activity Summary, Achievements Tab, Color-Coded Activity Timeline, Read-Only Profile Card, Full Profile CSV Export
  */
 
-import { useState, useRef, useTransition, useEffect, useCallback } from "react";
+import { useState, useRef, useTransition, useEffect, useCallback, useMemo } from "react";
 import { RCMS_BRANCHES } from "@/constants/branches";
+import { sortMembersByClubMembershipId } from "@/core/utils/member-sorting";
 import {
   registerMemberAction,
   updateMemberAction,
@@ -61,7 +62,7 @@ interface MembersClientProps {
 }
 
 export function MembersClient({ initialMembers }: MembersClientProps) {
-  const [members, setMembers] = useState<MemberSelect[]>(initialMembers);
+  const [members, setMembers] = useState<MemberSelect[]>(() => sortMembersByClubMembershipId(initialMembers));
   const [searchQuery, setSearchQuery] = useState("");
   const [branchFilter, setBranchFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
@@ -99,7 +100,7 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
     startTransition(async () => {
       const res = await searchMembersAction("", { limit: 1000 });
       if (res.success && res.data) {
-        setMembers(res.data.items);
+        setMembers(sortMembersByClubMembershipId(res.data.items));
       }
     });
   }, []);
@@ -156,7 +157,11 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
     });
   };
 
-  const filteredMembers = members.filter((m) => {
+  const sortedMembers = useMemo(() => {
+    return sortMembersByClubMembershipId(members);
+  }, [members]);
+
+  const filteredMembers = sortedMembers.filter((m) => {
     const q = searchQuery.toLowerCase().trim();
     const matchQuery =
       !q ||
@@ -201,7 +206,9 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
         role,
       });
 
-      if (res.success) {
+      if (res.success && res.data) {
+        const newMember = res.data;
+        setMembers((prevMembers) => sortMembersByClubMembershipId([newMember, ...prevMembers]));
         setIsAddModalOpen(false);
         resetForm();
         handleRefresh();
@@ -227,13 +234,26 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
         role,
       });
 
-      if (res.success) {
+      if (res.success && res.data) {
+        const updatedMember = res.data;
+
+        // 1. Instantly update React local members list & preserve Club Membership ID ordering
+        setMembers((prevMembers) => {
+          const updatedList = prevMembers.map((m) => (m.id === updatedMember.id ? updatedMember : m));
+          return sortMembersByClubMembershipId(updatedList);
+        });
+
+        // 2. If workspace is open for this edited member, immediately update workspace state with updated member
+        if (activeWorkspaceMember?.id === updatedMember.id) {
+          setActiveWorkspaceMember(updatedMember);
+          handleOpenMemberWorkspace(updatedMember);
+        }
+
         setIsEditModalOpen(false);
         setSelectedMember(null);
         resetForm();
-        if (activeWorkspaceMember?.id === selectedMember.id) {
-          handleOpenMemberWorkspace(selectedMember);
-        }
+
+        // 3. Re-fetch fresh data from server action to ensure 100% cache synchronization
         handleRefresh();
       } else {
         alert(res.error?.message || "Failed to update member");

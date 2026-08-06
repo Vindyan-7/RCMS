@@ -85,28 +85,34 @@ export class MembersService extends BaseService<
 
     const currentMember = await this.getById(id);
 
+    const updatePayload = { ...data };
+    if (updatePayload.branch) {
+      const { normalizeBranch } = require("@/constants/branches");
+      updatePayload.branch = normalizeBranch(updatePayload.branch);
+    }
+
     // Uniqueness check if updating roll number or email
-    if (data.rollNumber && data.rollNumber !== currentMember.rollNumber) {
-      const existingRoll = await this.membersRepo.findByRollNumber(data.rollNumber);
-      if (existingRoll) {
+    if (updatePayload.rollNumber && updatePayload.rollNumber !== currentMember.rollNumber) {
+      const existingRoll = await this.membersRepo.findByRollNumber(updatePayload.rollNumber);
+      if (existingRoll && existingRoll.id !== id) {
         throw new ConflictError(
-          `Roll number ${data.rollNumber} is already in use`,
+          `Roll number ${updatePayload.rollNumber} is already in use`,
           "MEMBER_ALREADY_EXISTS"
         );
       }
     }
 
-    if (data.email && data.email !== currentMember.email) {
-      const existingEmail = await this.membersRepo.findByEmail(data.email);
-      if (existingEmail) {
+    if (updatePayload.email && updatePayload.email !== currentMember.email) {
+      const existingEmail = await this.membersRepo.findByEmail(updatePayload.email);
+      if (existingEmail && existingEmail.id !== id) {
         throw new ConflictError(
-          `Email address ${data.email} is already in use`,
+          `Email address ${updatePayload.email} is already in use`,
           "MEMBER_ALREADY_EXISTS"
         );
       }
     }
 
-    return this.membersRepo.update(id, data, actorId);
+    return this.membersRepo.update(id, updatePayload, actorId);
   }
 
   public async getMemberProfile(id: UUID): Promise<MemberProfileResponse> {

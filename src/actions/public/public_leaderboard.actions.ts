@@ -165,7 +165,7 @@ export async function getPublicLeaderboardAction(): Promise<{
       }
 
       const tasksCompleted = taskMap[m.id] || 0;
-      const branch = deriveBranch(m.roll_number, m.branch);
+      const branch = deriveBranch(m.branch, m.roll_number);
 
       return {
         memberName: m.name || "Anonymous Member",
