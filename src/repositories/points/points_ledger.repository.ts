@@ -238,4 +238,71 @@ export class PointsLedgerRepository {
       totalPages: Math.max(1, Math.ceil(total / limit)),
     };
   }
+
+  public async revokePointsForSession(sessionId: UUID, revokerId?: UUID): Promise<number> {
+    try {
+      const { data: records } = await db
+        .from("attendance_records")
+        .select("id")
+        .eq("session_id", sessionId);
+
+      const recordIds = (records || []).map((r: any) => r.id);
+
+      if (recordIds.length === 0) return 0;
+
+      const now = new Date().toISOString();
+      const { data: updated, error } = await db
+        .from(this.tableName)
+        .update({
+          is_revoked: true,
+          revoked_at: now,
+          revocation_reason: "Attendance session archived for safe rollback",
+        })
+        .in("reference_id", recordIds)
+        .select();
+
+      if (error) {
+        logger.error("[PointsLedgerRepository] Failed to revoke points for session", error);
+        return 0;
+      }
+
+      return updated ? updated.length : 0;
+    } catch (err) {
+      logger.error("[PointsLedgerRepository] Error revoking session points", err);
+      return 0;
+    }
+  }
+
+  public async restorePointsForSession(sessionId: UUID, restorerId?: UUID): Promise<number> {
+    try {
+      const { data: records } = await db
+        .from("attendance_records")
+        .select("id")
+        .eq("session_id", sessionId);
+
+      const recordIds = (records || []).map((r: any) => r.id);
+
+      if (recordIds.length === 0) return 0;
+
+      const { data: updated, error } = await db
+        .from(this.tableName)
+        .update({
+          is_revoked: false,
+          revoked_at: null,
+          revocation_reason: null,
+        })
+        .in("reference_id", recordIds)
+        .select();
+
+      if (error) {
+        logger.error("[PointsLedgerRepository] Failed to restore points for session", error);
+        return 0;
+      }
+
+      return updated ? updated.length : 0;
+    } catch (err) {
+      logger.error("[PointsLedgerRepository] Error restoring session points", err);
+      return 0;
+    }
+  }
 }

@@ -61,11 +61,16 @@ export class AttendanceRecordsService {
       throw new NotFoundError(`Session with ID ${data.sessionId} not found`, "SESSION_CLOSED");
     }
 
-    if (session.status === "archived") {
-      throw new BadRequestError(
-        `Session is archived. Check-ins allowed only for active or open sessions`,
-        "SESSION_CLOSED"
-      );
+    const { evaluateSessionStatus } = require("@/core/utils/attendance-status-evaluator");
+    const effectiveStatus = evaluateSessionStatus(session);
+
+    if (effectiveStatus === "completed" || effectiveStatus === "closed" || effectiveStatus === "archived" || effectiveStatus === "paused") {
+      if (data.method !== "checklist" && data.method !== "manual") {
+        throw new BadRequestError(
+          `Attendance is closed for session "${session.title}". Scanner and PIN check-ins are disabled.`,
+          "SESSION_CLOSED"
+        );
+      }
     }
 
     const existingRecord = await this.recordsRepo.findByMemberAndSession(

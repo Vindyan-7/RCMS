@@ -21,7 +21,9 @@ import {
   Settings,
   GraduationCap,
   Bot,
+  Clock,
 } from "lucide-react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +45,20 @@ export function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState<string>("");
+
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, "0");
+      const minutes = String(now.getMinutes()).padStart(2, "0");
+      const seconds = String(now.getSeconds()).padStart(2, "0");
+      setCurrentTime(`${hours}:${minutes}:${seconds}`);
+    };
+    updateClock();
+    const interval = setInterval(updateClock, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -76,7 +92,13 @@ export function Header() {
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* Digital 24-Hour Live Clock */}
+          <div className="flex items-center space-x-1.5 rounded-xl border border-border bg-card/80 px-2.5 sm:px-3 py-1 font-mono text-xs font-bold text-foreground shadow-sm">
+            <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>{currentTime || "--:--:--"}</span>
+          </div>
+
           <Button variant="outline" size="icon" className="relative h-8 w-8 sm:h-9 sm:w-9">
             <Bell className="h-4 w-4" />
             <span className="absolute -right-1 -top-1 flex h-2.5 w-2.5">

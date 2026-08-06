@@ -1,17 +1,17 @@
-import { getAttendanceSessionsAction } from "@/actions/attendance/attendance_sessions.actions";
-import { getAttendanceRecordsAction } from "@/actions/attendance/attendance_records.actions";
+import { getAttendanceDashboardInitialDataAction } from "@/actions/attendance/attendance_sessions.actions";
 import { AttendanceClient } from "@/components/attendance/attendance-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function AttendancePage() {
-  const [sessionsRes, recordsRes] = await Promise.all([
-    getAttendanceSessionsAction(),
-    getAttendanceRecordsAction(),
-  ]);
-
-  const sessions = sessionsRes.data?.items || [];
-  const records = recordsRes.data?.items || [];
+  const initRes = await getAttendanceDashboardInitialDataAction();
+  const initialData = initRes.data || {
+    sessions: [],
+    archivedSessions: [],
+    records: [],
+    semesterContext: null,
+    enrolledMembers: [],
+  };
 
   return (
     <div className="space-y-6">
@@ -24,7 +24,13 @@ export default async function AttendancePage() {
         </p>
       </div>
 
-      <AttendanceClient initialSessions={sessions} initialRecords={records} />
+      <AttendanceClient
+        initialSessions={initialData.sessions}
+        initialRecords={initialData.records}
+        initialArchivedSessions={initialData.archivedSessions}
+        initialSemesterContext={initialData.semesterContext}
+        initialEnrolledMembers={initialData.enrolledMembers}
+      />
     </div>
   );
 }

@@ -23,18 +23,32 @@ export interface SemesterContextMetadata {
 }
 
 export class SemesterContextService {
+  private cachedActiveSemester: SemesterSelect | null | undefined = undefined;
+  private cachedAcademicYear: AcademicYearSelect | null | undefined = undefined;
+  private cachedEnrolledMembers: MemberSelect[] | undefined = undefined;
+
   constructor(
     private readonly semestersRepo: SemestersRepository = new SemestersRepository(),
     private readonly membershipsRepo: MembershipsRepository = new MembershipsRepository()
   ) {}
+
+  public clearCache(): void {
+    this.cachedActiveSemester = undefined;
+    this.cachedAcademicYear = undefined;
+    this.cachedEnrolledMembers = undefined;
+  }
 
   /**
    * Retrieves the currently active semester from the system.
    * Returns null if no semester is currently active.
    */
   public async getActiveSemester(): Promise<SemesterSelect | null> {
+    if (this.cachedActiveSemester !== undefined) {
+      return this.cachedActiveSemester;
+    }
     logger.debug("[SemesterContextService] Fetching active semester");
-    return this.semestersRepo.findActive();
+    this.cachedActiveSemester = await this.semestersRepo.findActive();
+    return this.cachedActiveSemester;
   }
 
   /**

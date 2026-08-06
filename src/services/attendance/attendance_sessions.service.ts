@@ -98,13 +98,60 @@ export class AttendanceSessionsService extends BaseService<
     return this.sessionsRepo.update(id, { status: "completed" }, actorId);
   }
 
+  public async archiveSession(id: UUID, actorId: UUID): Promise<AttendanceSessionSelect> {
+    logger.info("[AttendanceSessionsService] Archiving attendance session and reversing points", { id, actorId });
+    const session = await this.getById(id);
+    if (session.status === "archived") {
+      throw new BadRequestError(`Session "${session.title}" is already archived.`);
+    }
+    if (session.status !== "completed" && session.status !== "closed") {
+      throw new BadRequestError(`Only completed attendance sessions can be archived. Current status: ${session.status}`);
+    }
+
+    const updatedSession = await this.sessionsRepo.update(id, { status: "archived" }, actorId);
+
+    try {
+      const { PointsLedgerRepository } = require("@/repositories/points/points_ledger.repository");
+      const pointsLedgerRepo = new PointsLedgerRepository();
+      const revokedCount = await pointsLedgerRepo.revokePointsForSession(id, actorId);
+      logger.info("[AttendanceSessionsService] Revoked session points for archival", { id, revokedCount });
+    } catch (err) {
+      logger.error("[AttendanceSessionsService] Error revoking points during archival", err);
+    }
+
+    return updatedSession;
+  }
+
+  public async restoreSession(id: UUID, actorId: UUID): Promise<AttendanceSessionSelect> {
+    logger.info("[AttendanceSessionsService] Restoring attendance session and points", { id, actorId });
+    const session = await this.getById(id);
+    if (session.status !== "archived") {
+      throw new BadRequestError(`Only archived sessions can be restored. Current status: ${session.status}`);
+    }
+
+    const updatedSession = await this.sessionsRepo.update(id, { status: "completed" }, actorId);
+
+    try {
+      const { PointsLedgerRepository } = require("@/repositories/points/points_ledger.repository");
+      const pointsLedgerRepo = new PointsLedgerRepository();
+      const restoredCount = await pointsLedgerRepo.restorePointsForSession(id, actorId);
+      logger.info("[AttendanceSessionsService] Restored session points after unarchiving", { id, restoredCount });
+    } catch (err) {
+      logger.error("[AttendanceSessionsService] Error restoring points during session restore", err);
+    }
+
+    return updatedSession;
+  }
+
   public async lockSession(id: UUID, actorId: UUID): Promise<AttendanceSessionSelect> {
-    logger.info("[AttendanceSessionsService] Locking attendance session", { id, actorId });
-    await this.getById(id);
-    return this.sessionsRepo.update(id, { status: "archived" }, actorId);
+    return this.archiveSession(id, actorId);
   }
 
   public async getActiveSessions(pagination: PaginationQuery): Promise<PaginatedResult<AttendanceSessionSelect>> {
-    return this.sessionsRepo.findAll(pagination);
+    return this.sessionsRepo.findAll(pagination, { includeArchived: false });
+  }
+
+  public async getArchivedSessions(pagination: PaginationQuery): Promise<PaginatedResult<AttendanceSessionSelect>> {
+    return this.sessionsRepo.findAll(pagination, { onlyArchived: true });
   }
 }

@@ -52,17 +52,21 @@ export async function generateVolunteerCodeAction(
 
 export async function validateVolunteerCodeAction(
   rawInput: unknown
-): Promise<ApiResponse<VolunteerCodeSelect>> {
+): Promise<ApiResponse<any>> {
   logger.info("[Action: validateVolunteerCodeAction] Initiating action execution");
   try {
     const actor = await getActorContext();
     const validatedInput = await VolunteerCodesValidator.validateCode(rawInput);
 
     const codeRecord = await codesService.validateCode(validatedInput.code, actor.id);
+    const session = await sessionsRepo.findById(codeRecord.sessionId);
 
     return {
       success: true,
-      data: codeRecord,
+      data: {
+        ...codeRecord,
+        session,
+      },
     };
   } catch (error) {
     logger.error("[Action: validateVolunteerCodeAction] Execution failed", error);

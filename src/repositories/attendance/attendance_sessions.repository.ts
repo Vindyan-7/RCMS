@@ -31,7 +31,10 @@ export class AttendanceSessionsRepository extends BaseRepository<
           query = query.is("deleted_at", null);
         }
         const { data } = await query.limit(1);
-        if (data && data[0]) return toCamelCase<AttendanceSessionSelect>(data[0]);
+        if (data && data[0]) {
+          const { applyEffectiveSessionStatus } = require("@/core/utils/attendance-status-evaluator");
+          return applyEffectiveSessionStatus(toCamelCase<AttendanceSessionSelect>(data[0]));
+        }
       } catch (err) {
         logger.error("[AttendanceSessionsRepository] REST findById error", err);
       }
@@ -49,7 +52,10 @@ export class AttendanceSessionsRepository extends BaseRepository<
         .where(and(...conditions))
         .limit(1);
 
-      if (result[0]) return result[0];
+      if (result[0]) {
+        const { applyEffectiveSessionStatus } = require("@/core/utils/attendance-status-evaluator");
+        return applyEffectiveSessionStatus(result[0]);
+      }
     } catch (err) {
       logger.error("[AttendanceSessionsRepository] Drizzle findById error", err);
     }
@@ -60,7 +66,10 @@ export class AttendanceSessionsRepository extends BaseRepository<
         query = query.is("deleted_at", null);
       }
       const { data } = await query.limit(1);
-      if (data && data[0]) return toCamelCase<AttendanceSessionSelect>(data[0]);
+      if (data && data[0]) {
+        const { applyEffectiveSessionStatus } = require("@/core/utils/attendance-status-evaluator");
+        return applyEffectiveSessionStatus(toCamelCase<AttendanceSessionSelect>(data[0]));
+      }
     } catch {}
 
     return null;
@@ -68,23 +77,25 @@ export class AttendanceSessionsRepository extends BaseRepository<
 
   public async findAll(
     query: PaginationQuery,
-    options?: QueryOptions
+    options?: QueryOptions & { includeArchived?: boolean; onlyArchived?: boolean }
   ): Promise<PaginatedResult<AttendanceSessionSelect>> {
     const page = query.page || 1;
     const limit = query.limit || 1000;
     const offset = (page - 1) * limit;
 
-    const conditions = [];
-    if (!options?.includeDeleted) {
-      conditions.push(isNull(attendanceSessions.deletedAt));
-    }
-
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
     let items: AttendanceSessionSelect[] = [];
     if (isServerless) {
       try {
-        const { data } = await supabase.from("attendance_sessions").select("*").is("deleted_at", null);
+        let req = supabase.from("attendance_sessions").select("*");
+        if (!options?.includeDeleted) {
+          req = req.is("deleted_at", null);
+        }
+        if (options?.onlyArchived) {
+          req = req.eq("status", "archived");
+        } else if (!options?.includeArchived) {
+          req = req.neq("status", "archived");
+        }
+        const { data } = await req;
         if (data && data.length > 0) {
           items = toCamelCase<AttendanceSessionSelect[]>(data);
         }
@@ -93,6 +104,17 @@ export class AttendanceSessionsRepository extends BaseRepository<
       }
     } else {
       try {
+        const { ne } = require("drizzle-orm");
+        const conditions = [];
+        if (!options?.includeDeleted) {
+          conditions.push(isNull(attendanceSessions.deletedAt));
+        }
+        if (options?.onlyArchived) {
+          conditions.push(eq(attendanceSessions.status, "archived"));
+        } else if (!options?.includeArchived) {
+          conditions.push(ne(attendanceSessions.status, "archived"));
+        }
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
         items = await db
           .select()
           .from(attendanceSessions)
@@ -105,7 +127,16 @@ export class AttendanceSessionsRepository extends BaseRepository<
 
       if (items.length === 0) {
         try {
-          const { data } = await supabase.from("attendance_sessions").select("*").is("deleted_at", null);
+          let req = supabase.from("attendance_sessions").select("*");
+          if (!options?.includeDeleted) {
+            req = req.is("deleted_at", null);
+          }
+          if (options?.onlyArchived) {
+            req = req.eq("status", "archived");
+          } else if (!options?.includeArchived) {
+            req = req.neq("status", "archived");
+          }
+          const { data } = await req;
           if (data && data.length > 0) {
             items = toCamelCase<AttendanceSessionSelect[]>(data);
           }
@@ -113,12 +144,15 @@ export class AttendanceSessionsRepository extends BaseRepository<
       }
     }
 
+    const { applyEffectiveSessionStatus } = require("@/core/utils/attendance-status-evaluator");
+    const evaluatedItems = items.map((item) => applyEffectiveSessionStatus(item));
+
     return {
-      items,
-      total: items.length,
+      items: evaluatedItems,
+      total: evaluatedItems.length,
       page,
       limit,
-      totalPages: this.calculateTotalPages(items.length, limit),
+      totalPages: this.calculateTotalPages(evaluatedItems.length, limit),
     };
   }
 

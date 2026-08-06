@@ -343,7 +343,7 @@ export async function getMemberWorkspaceDataAction(memberId: string): Promise<Ap
       membersRepo.findById(memberId),
       supabase.from("semesters").select("id, name, status, academic_years(name)").eq("status", "active").is("deleted_at", null).limit(1),
       supabase.from("memberships").select("*, semesters(name, academic_years(name))").eq("member_id", memberId).is("deleted_at", null),
-      supabase.from("attendance_records").select("*, attendance_sessions(title, date, attendance_points)").eq("member_id", memberId),
+      supabase.from("attendance_records").select("*, attendance_sessions!inner(title, date, attendance_points, status)").eq("member_id", memberId).neq("attendance_sessions.status", "archived"),
       supabase.from("task_completions").select("*, tasks(title, category, points)").eq("member_id", memberId).eq("is_revoked", false),
       supabase.from("event_participations").select("*, events(name, venue, points, start_date)").eq("member_id", memberId),
       supabase.from("points_ledger").select("*").eq("member_id", memberId).order("created_at", { ascending: false }),
@@ -363,13 +363,13 @@ export async function getMemberWorkspaceDataAction(memberId: string): Promise<Ap
     const attendanceRecords = attRes.data || [];
     const taskCompletions = taskRes.data || [];
     const eventParticipations = evtRes.data || [];
-    const pointsEntries = ptsRes.data || [];
+    const pointsEntries = (ptsRes.data || []).filter((p: any) => !p.is_revoked);
 
     // Calculate total points
     const totalPoints = pointsEntries.reduce((sum: number, p: any) => sum + (p.points || 0), 0);
 
     // Calculate total sessions
-    const { data: allSessions } = await supabase.from("attendance_sessions").select("id").is("deleted_at", null);
+    const { data: allSessions } = await supabase.from("attendance_sessions").select("id").neq("status", "archived").is("deleted_at", null);
     const totalSessionsCount = allSessions ? allSessions.length : 1;
 
     const presentCount = attendanceRecords.length;

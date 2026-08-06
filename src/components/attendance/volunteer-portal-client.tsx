@@ -79,17 +79,24 @@ export function VolunteerPortalClient() {
     return () => clearInterval(interval);
   }, []);
 
-  // Polling check for PIN expiration or coordinator termination
+  // Polling check for PIN expiration or coordinator session closure / completion
   useEffect(() => {
     if (!authSession) return;
 
     const interval = setInterval(async () => {
       const res = await validateVolunteerCodeAction({ code: authSession.codeRecord.code });
-      if (!res.success) {
+      if (!res.success || !res.data) {
         setAuthSession(null);
         setLoginError("Your Volunteer Passcode PIN has expired or been terminated by the coordinator.");
+        return;
       }
-    }, 10000);
+
+      const sessionStatus = res.data.session?.status;
+      if (sessionStatus === "completed" || sessionStatus === "closed" || sessionStatus === "archived") {
+        setAuthSession(null);
+        setLoginError("Attendance Closed — This attendance session has been completed by the coordinator.");
+      }
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [authSession]);
@@ -228,6 +235,28 @@ export function VolunteerPortalClient() {
   const remainingMins = Math.floor(remainingMs / 60000);
   const remainingSecs = Math.floor((remainingMs % 60000) / 1000);
 
+  // Scheduled Start & End Time Preparation Countdown
+  const sessionDateStr = authSession
+    ? typeof authSession.session.date === "string"
+      ? authSession.session.date
+      : new Date(authSession.session.date).toISOString().split("T")[0]
+    : "";
+  const sessionStartTime = authSession
+    ? new Date(`${sessionDateStr}T${authSession.session.startTime || "00:00:00"}`).getTime()
+    : 0;
+  const sessionEndTime = authSession
+    ? new Date(`${sessionDateStr}T${authSession.session.endTime || "23:59:59"}`).getTime()
+    : 0;
+
+  const countdownMs = Math.max(0, sessionStartTime - nowTime);
+  const isPreSession = countdownMs > 0 && (authSession?.session.status === "prepared" || authSession?.session.status === "scheduled" || authSession?.session.status === "draft");
+  const isPostSession = authSession ? nowTime > sessionEndTime : false;
+
+  const countdownHrs = Math.floor(countdownMs / (1000 * 60 * 60));
+  const countdownMins = Math.floor((countdownMs % (1000 * 60 * 60)) / (1000 * 60));
+  const countdownSecs = Math.floor((countdownMs % (1000 * 60)) / 1000);
+  const formattedCountdown = `${String(countdownHrs).padStart(2, "0")}:${String(countdownMins).padStart(2, "0")}:${String(countdownSecs).padStart(2, "0")}`;
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between p-3 sm:p-6 font-sans select-none">
       {/* Top Header */}
@@ -342,6 +371,31 @@ export function VolunteerPortalClient() {
               </p>
             </div>
           </div>
+        ) : isPreSession ? (
+          /* PREPARED COUNTDOWN SCREEN */
+          <div className="rounded-2xl border border-amber-800/40 bg-amber-950/20 p-6 text-center space-y-4 shadow-xl">
+            <div className="flex justify-center">
+              <Clock className="h-12 w-12 text-amber-400 animate-pulse" />
+            </div>
+            <div className="space-y-1">
+              <Badge className="bg-amber-950 text-amber-300 border-amber-800 uppercase text-[10px]">
+                Prepared (Activation Validated)
+              </Badge>
+              <h2 className="text-xl font-bold text-amber-200">{authSession.session.title}</h2>
+              <p className="text-xs text-amber-400/80">
+                Volunteer: <strong>{authSession.volunteerMember.name}</strong> • Scheduled Start: {new Date(sessionStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-background/60 border border-amber-800/60 font-mono space-y-1">
+              <div className="text-[11px] text-amber-400 font-semibold uppercase tracking-wider">Attendance Begins In</div>
+              <div className="text-3xl font-extrabold text-amber-300 tracking-widest">{formattedCountdown}</div>
+            </div>
+
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Your volunteer activation code has been validated. Attendance scanning will automatically unlock when the timer reaches 00:00:00.
+            </p>
+          </div>
         ) : (
           /* STATE 2: VOLUNTEER ATTENDANCE APP INTERFACE */
           <div className="space-y-4">
@@ -355,7 +409,9 @@ export function VolunteerPortalClient() {
                     <span>Volunteer: <strong className="text-foreground">{authSession.volunteerMember.name}</strong></span>
                   </p>
                 </div>
-                <Badge variant="success" className="animate-pulse text-[10px]">Attendance Active</Badge>
+                <Badge variant={isPostSession ? "secondary" : "success"} className={`text-[10px] ${isPostSession ? "" : "animate-pulse"}`}>
+                  {isPostSession ? "Late Attendance Active" : "Attendance Active"}
+                </Badge>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs border-t border-primary/20 pt-2.5">

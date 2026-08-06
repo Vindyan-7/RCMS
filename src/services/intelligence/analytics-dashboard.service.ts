@@ -101,7 +101,7 @@ export class AnalyticsDashboardService {
       supabase.from("members").select("id, name, member_id, club_membership_id, branch, year, status, created_at").is("deleted_at", null),
       supabase.from("memberships").select("id, member_id, semester_id, status, join_date").is("deleted_at", null),
       supabase.from("attendance_records").select("id, session_id, member_id, late, scan_time"),
-      supabase.from("attendance_sessions").select("id, title, date").is("deleted_at", null),
+      supabase.from("attendance_sessions").select("id, title, date, status").neq("status", "archived").is("deleted_at", null),
       supabase.from("tasks").select("id, title, status, points").is("deleted_at", null),
       supabase.from("task_completions").select("id, task_id, member_id, is_revoked").eq("is_revoked", false),
       supabase.from("events").select("id, name, status, points").is("deleted_at", null),

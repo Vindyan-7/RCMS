@@ -108,24 +108,50 @@ export async function closeAttendanceSessionAction(
   }
 }
 
-export async function lockAttendanceSessionAction(
+export async function archiveAttendanceSessionAction(
   id: string
 ): Promise<ApiResponse<AttendanceSessionSelect>> {
-  logger.info("[Action: lockAttendanceSessionAction] Initiating action execution", { id });
+  logger.info("[Action: archiveAttendanceSessionAction] Initiating action execution", { id });
   try {
     const actor = await getActorContext();
     Authorizer.hasPermission(actor, PERMISSIONS.ATTENDANCE_EDIT);
 
-    const session = await sessionsService.lockSession(id, actor.id);
+    const session = await sessionsService.archiveSession(id, actor.id);
 
     return {
       success: true,
       data: session,
     };
   } catch (error) {
-    logger.error("[Action: lockAttendanceSessionAction] Execution failed", error);
+    logger.error("[Action: archiveAttendanceSessionAction] Execution failed", error);
     return formatErrorResponse(error);
   }
+}
+
+export async function restoreAttendanceSessionAction(
+  id: string
+): Promise<ApiResponse<AttendanceSessionSelect>> {
+  logger.info("[Action: restoreAttendanceSessionAction] Initiating action execution", { id });
+  try {
+    const actor = await getActorContext();
+    Authorizer.hasPermission(actor, PERMISSIONS.ATTENDANCE_EDIT);
+
+    const session = await sessionsService.restoreSession(id, actor.id);
+
+    return {
+      success: true,
+      data: session,
+    };
+  } catch (error) {
+    logger.error("[Action: restoreAttendanceSessionAction] Execution failed", error);
+    return formatErrorResponse(error);
+  }
+}
+
+export async function lockAttendanceSessionAction(
+  id: string
+): Promise<ApiResponse<AttendanceSessionSelect>> {
+  return archiveAttendanceSessionAction(id);
 }
 
 export async function getAttendanceSessionsAction(
@@ -136,7 +162,7 @@ export async function getAttendanceSessionsAction(
     const actor = await getActorContext();
     Authorizer.hasPermission(actor, PERMISSIONS.ATTENDANCE_VIEW);
 
-    const sessions = await sessionsService.getAll(pagination || {});
+    const sessions = await sessionsService.getActiveSessions(pagination || {});
 
     return {
       success: true,
@@ -144,6 +170,69 @@ export async function getAttendanceSessionsAction(
     };
   } catch (error) {
     logger.error("[Action: getAttendanceSessionsAction] Execution failed", error);
+    return formatErrorResponse(error);
+  }
+}
+
+export async function getArchivedAttendanceSessionsAction(
+  pagination?: PaginationQuery
+): Promise<ApiResponse<PaginatedResult<AttendanceSessionSelect>>> {
+  logger.debug("[Action: getArchivedAttendanceSessionsAction] Initiating action execution");
+  try {
+    const actor = await getActorContext();
+    Authorizer.hasPermission(actor, PERMISSIONS.ATTENDANCE_VIEW);
+
+    const sessions = await sessionsService.getArchivedSessions(pagination || {});
+
+    return {
+      success: true,
+      data: sessions,
+    };
+  } catch (error) {
+    logger.error("[Action: getArchivedAttendanceSessionsAction] Execution failed", error);
+    return formatErrorResponse(error);
+  }
+}
+
+export interface AttendanceDashboardInitialData {
+  sessions: AttendanceSessionSelect[];
+  archivedSessions: AttendanceSessionSelect[];
+  records: any[];
+  semesterContext: any;
+  enrolledMembers: any[];
+}
+
+export async function getAttendanceDashboardInitialDataAction(): Promise<ApiResponse<AttendanceDashboardInitialData>> {
+  logger.info("[Action: getAttendanceDashboardInitialDataAction] Initiating consolidated data load");
+  try {
+    const actor = await getActorContext();
+    Authorizer.hasPermission(actor, PERMISSIONS.ATTENDANCE_VIEW);
+
+    const { AttendanceRecordsRepository } = await import("@/repositories/attendance");
+    const { SemesterContextService } = await import("@/services/academic/semester-context.service");
+    const recordsRepo = new AttendanceRecordsRepository();
+    const semesterContextService = new SemesterContextService();
+
+    const [sessRes, archRes, recsRes, metaRes, membersRes] = await Promise.all([
+      sessionsService.getActiveSessions({ limit: 1000 }),
+      sessionsService.getArchivedSessions({ limit: 1000 }),
+      recordsRepo.getAll({ limit: 1000 }),
+      semesterContextService.getSemesterMetadata(),
+      semesterContextService.getEnrolledMembers(),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        sessions: sessRes.items,
+        archivedSessions: archRes.items,
+        records: recsRes.items,
+        semesterContext: metaRes,
+        enrolledMembers: membersRes,
+      },
+    };
+  } catch (error) {
+    logger.error("[Action: getAttendanceDashboardInitialDataAction] Execution failed", error);
     return formatErrorResponse(error);
   }
 }

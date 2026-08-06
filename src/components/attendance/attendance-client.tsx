@@ -12,6 +12,9 @@ import {
   closeAttendanceSessionAction,
   pauseAttendanceSessionAction,
   getAttendanceSessionsAction,
+  archiveAttendanceSessionAction,
+  restoreAttendanceSessionAction,
+  getArchivedAttendanceSessionsAction,
 } from "@/actions/attendance/attendance_sessions.actions";
 import {
   generateVolunteerCodeAction,
@@ -53,36 +56,64 @@ import {
   Copy,
   AlertTriangle,
   Search,
+  Archive,
+  RotateCcw,
+  Eye,
 } from "lucide-react";
 import Link from "next/link";
 
 interface AttendanceClientProps {
   initialSessions: AttendanceSessionSelect[];
   initialRecords: AttendanceRecordSelect[];
+  initialArchivedSessions?: AttendanceSessionSelect[];
+  initialSemesterContext?: SemesterContextMetadata | null;
+  initialEnrolledMembers?: MemberSelect[];
 }
 
-export function AttendanceClient({ initialSessions, initialRecords }: AttendanceClientProps) {
+export function AttendanceClient({
+  initialSessions,
+  initialRecords,
+  initialArchivedSessions = [],
+  initialSemesterContext = null,
+  initialEnrolledMembers = [],
+}: AttendanceClientProps) {
   const [sessions, setSessions] = useState<AttendanceSessionSelect[]>(initialSessions);
+  const [archivedSessions, setArchivedSessions] = useState<AttendanceSessionSelect[]>(initialArchivedSessions);
   const [records, setRecords] = useState<AttendanceRecordSelect[]>(initialRecords);
+  const [sessionSection, setSessionSection] = useState<"active" | "archived">("active");
 
-  const [semesterContext, setSemesterContext] = useState<SemesterContextMetadata | null>(null);
-  const [enrolledMembers, setEnrolledMembers] = useState<MemberSelect[]>([]);
+  const [semesterContext, setSemesterContext] = useState<SemesterContextMetadata | null>(initialSemesterContext);
+  const [enrolledMembers, setEnrolledMembers] = useState<MemberSelect[]>(initialEnrolledMembers);
   const [isPending, startTransition] = useTransition();
 
   const refreshSessionsAndRecords = useCallback(async () => {
     try {
-      const [sessRes, recsRes, metaRes, membersRes] = await Promise.all([
-        getAttendanceSessionsAction(),
-        getAttendanceRecordsAction(),
-        getSemesterContextMetadataAction(),
-        getEnrolledMembersForActiveSemesterAction(),
-      ]);
-      if (sessRes.success && sessRes.data) setSessions(sessRes.data.items);
-      if (recsRes.success && recsRes.data) setRecords(recsRes.data.items);
-      if (metaRes.success && metaRes.data) setSemesterContext(metaRes.data);
-      if (membersRes.success && membersRes.data) setEnrolledMembers(membersRes.data);
+      const { getAttendanceDashboardInitialDataAction } = await import("@/actions/attendance/attendance_sessions.actions");
+      const res = await getAttendanceDashboardInitialDataAction();
+      if (res.success && res.data) {
+        setSessions(res.data.sessions);
+        setArchivedSessions(res.data.archivedSessions);
+        setRecords(res.data.records);
+        setSemesterContext(res.data.semesterContext);
+        setEnrolledMembers(res.data.enrolledMembers);
+      }
     } catch {}
   }, []);
+
+  // Live timer tick for real-time automatic session status evaluation
+  const [nowTick, setNowTick] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNowTick(Date.now());
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const evaluatedSessions = useMemo(() => {
+    const { applyEffectiveSessionStatus } = require("@/core/utils/attendance-status-evaluator");
+    return sessions.map((s) => applyEffectiveSessionStatus(s, new Date(nowTick)));
+  }, [sessions, nowTick]);
 
   // Phase 1: Auto-fetch fresh data when page is opened / mounted
   useEffect(() => {
@@ -102,6 +133,35 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
 
   const [selectedSession, setSelectedSession] = useState<AttendanceSessionSelect | null>(null);
   const [sessionPins, setSessionPins] = useState<VolunteerCodeSelect[]>([]);
+
+  const handleArchiveSession = async (id: string) => {
+    if (!confirm("Are you sure you want to archive this attendance session? All awarded points for this session will be safely reversed from member totals and leaderboard until restored.")) return;
+
+    startTransition(async () => {
+      const res = await archiveAttendanceSessionAction(id);
+      if (res.success) {
+        setAlertMessage("Session archived successfully! Associated points have been safely reversed from member totals and leaderboard.");
+        refreshSessionsAndRecords();
+      } else {
+        alert(res.error?.message || "Failed to archive session");
+      }
+    });
+  };
+
+  const handleRestoreSession = async (id: string) => {
+    if (!confirm("Restore this archived attendance session? Points, activity records, and leaderboard standings for this session will be completely restored.")) return;
+
+    startTransition(async () => {
+      const res = await restoreAttendanceSessionAction(id);
+      if (res.success) {
+        setAlertMessage("Session restored successfully! Associated points and attendance standings have been returned.");
+        refreshSessionsAndRecords();
+      } else {
+        alert(res.error?.message || "Failed to restore session");
+      }
+    });
+  };
+
   const [volunteerPIN, setVolunteerPIN] = useState("");
   const [authenticatedSessionId, setAuthenticatedSessionId] = useState<string | null>(null);
   // Create Session Form Fields
@@ -249,6 +309,7 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
       const res = await closeAttendanceSessionAction(id);
       if (res.success) {
         setAlertMessage("Attendance session finalized and closed.");
+        setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, status: "completed" } : s)));
         refreshSessionsAndRecords();
       } else {
         alert(res.error?.message || "Failed to close session");
@@ -637,13 +698,46 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
         <div className="space-y-6">
           {/* Section Header Controls Bar */}
           <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-            <div>
+            <div className="space-y-1">
               <h2 className="text-lg font-bold text-foreground">
                 Attendance Sessions & Volunteer Activation
               </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Manage active club sessions, generate persistent PINs, and monitor live attendance
+              <p className="text-xs text-muted-foreground">
+                Manage active club sessions, generate persistent PINs, and manage attendance lifecycles
               </p>
+
+              {/* Sub-tab Toggle Pills for Active vs Archived */}
+              <div className="flex items-center space-x-2 pt-2">
+                <button
+                  onClick={() => setSessionSection("active")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors ${
+                    sessionSection === "active"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>Active & Completed Sessions</span>
+                  <Badge variant="secondary" className="text-[10px] ml-1 px-1.5 py-0">
+                    {sessions.length}
+                  </Badge>
+                </button>
+
+                <button
+                  onClick={() => setSessionSection("archived")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors ${
+                    sessionSection === "archived"
+                      ? "bg-amber-600 text-white shadow-sm"
+                      : "bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                  <span>Archived Sessions (Safe Rollback)</span>
+                  <Badge variant="secondary" className="text-[10px] ml-1 px-1.5 py-0 bg-amber-950 text-amber-300 border-amber-800">
+                    {archivedSessions.length}
+                  </Badge>
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -679,154 +773,277 @@ export function AttendanceClient({ initialSessions, initialRecords }: Attendance
             </div>
           </div>
 
-          {/* Grid of Session Cards matching Screenshot 1 */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {sessions.map((session) => {
-              const liveScansCount = records.filter((r) => r.sessionId === session.id).length;
-              return (
-                <div
-                  key={session.id}
-                  className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4 relative overflow-hidden flex flex-col justify-between"
-                >
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div className="pr-2">
-                        <h4 className="font-bold text-foreground text-sm line-clamp-1">
-                          {session.title}
-                        </h4>
-                        <p className="text-[11px] text-muted-foreground mt-1 flex items-center space-x-2">
-                          <Clock className="h-3 w-3 shrink-0" />
-                          <span>
-                            {new Date(session.date).toLocaleDateString("en-GB", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            })}{" "}
-                            • {session.startTime} - {session.endTime}
+          {sessionSection === "active" ? (
+            /* Grid of Active & Completed Session Cards */
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {evaluatedSessions.length === 0 ? (
+                <div className="col-span-full rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground text-xs">
+                  No active or completed attendance sessions found. Click &quot;Create Session&quot; to begin.
+                </div>
+              ) : (
+                evaluatedSessions.map((session) => {
+                  const liveScansCount = records.filter((r) => r.sessionId === session.id).length;
+                  return (
+                    <div
+                      key={session.id}
+                      className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4 relative overflow-hidden flex flex-col justify-between"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div className="pr-2">
+                            <h4 className="font-bold text-foreground text-sm line-clamp-1">
+                              {session.title}
+                            </h4>
+                            <p className="text-[11px] text-muted-foreground mt-1 flex items-center space-x-2">
+                              <Clock className="h-3 w-3 shrink-0" />
+                              <span>
+                                {new Date(session.date).toLocaleDateString("en-GB", {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                })}{" "}
+                                • {session.startTime} - {session.endTime}
+                              </span>
+                            </p>
+                          </div>
+
+                          {/* Status Badge Pills */}
+                          <Badge
+                            className={`capitalize text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                              session.status === "active"
+                                ? "bg-emerald-950/80 text-emerald-400 border-emerald-800/60 animate-pulse"
+                                : session.status === "paused"
+                                ? "bg-amber-950/80 text-amber-400 border-amber-800/60"
+                                : session.status === "prepared"
+                                ? "bg-amber-950/90 text-amber-300 border-amber-800/80"
+                                : session.status === "closed" || session.status === "completed"
+                                ? "bg-slate-900 text-slate-300 border-slate-700"
+                                : "bg-blue-950/80 text-blue-400 border-blue-800/60"
+                            }`}
+                          >
+                            {session.status === "active" ? "LIVE" : session.status === "scheduled" ? "UPCOMING" : session.status}
+                          </Badge>
+                        </div>
+
+                        <div className="flex justify-between items-center text-xs text-muted-foreground pt-1">
+                          <span className="font-bold text-blue-400 flex items-center space-x-1">
+                            <Ribbon className="h-3.5 w-3.5 text-blue-400" />
+                            <span>{session.attendancePoints} Pts</span>
                           </span>
-                        </p>
+
+                          <span className="flex items-center space-x-1 text-slate-300 font-mono text-[11px]">
+                            <Users className="h-3.5 w-3.5 text-slate-400" />
+                            <span>{liveScansCount} Live Scans</span>
+                          </span>
+                        </div>
                       </div>
 
-                      {/* Status Badge Pills */}
-                      <Badge
-                        className={`capitalize text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                          session.status === "active"
-                            ? "bg-emerald-950/80 text-emerald-400 border-emerald-800/60"
-                            : session.status === "paused"
-                            ? "bg-amber-950/80 text-amber-400 border-amber-800/60"
-                            : session.status === "closed"
-                            ? "bg-slate-900 text-slate-300 border-slate-700"
-                            : "bg-slate-800 text-slate-400 border-slate-700"
-                        }`}
-                      >
-                        {session.status}
-                      </Badge>
+                      {/* Session Action Controls */}
+                      <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-border/40">
+                        {(session.status === "draft" || session.status === "scheduled" || session.status === "prepared") && (
+                          <div className="grid grid-cols-2 gap-2 w-full">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={isPending}
+                              className="text-[11px] h-8 flex items-center space-x-1.5"
+                              onClick={() => handleManagePINs(session)}
+                            >
+                              <Key className="h-3.5 w-3.5 text-primary" /> <span>Manage PINs</span>
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              className="text-[11px] h-8 flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+                              onClick={() => handleOpenSession(session.id)}
+                            >
+                              <Play className="h-3.5 w-3.5" /> <span>Start Live</span>
+                            </Button>
+                          </div>
+                        )}
+
+                        {session.status === "active" && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={isPending}
+                              className="text-[11px] h-8 flex items-center space-x-1.5"
+                              onClick={() => handlePauseSession(session.id)}
+                            >
+                              <Pause className="h-3.5 w-3.5" /> <span>Pause</span>
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={isPending}
+                              className="text-[11px] h-8 flex items-center space-x-1.5 bg-red-600/90 hover:bg-red-600"
+                              onClick={() => handleCloseSession(session.id)}
+                            >
+                              <StopCircle className="h-3.5 w-3.5" /> <span>Close</span>
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={isPending}
+                              className="text-[11px] h-8 flex items-center space-x-1.5"
+                              onClick={() => handleManagePINs(session)}
+                            >
+                              <Key className="h-3.5 w-3.5 text-primary" /> <span>Manage PINs</span>
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              disabled={isPending}
+                              className="text-[11px] h-8 flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white"
+                              onClick={() => handleOpenAttendanceScreen(session)}
+                            >
+                              <UserCheck className="h-3.5 w-3.5" /> <span>Take Attendance</span>
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              disabled={isPending}
+                              className="text-[11px] h-8 flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-500 text-white"
+                              onClick={() => {
+                                setSelectedSession(session);
+                                setIsAuthOpen(true);
+                              }}
+                            >
+                              <Key className="h-3.5 w-3.5" /> <span>Authenticate</span>
+                            </Button>
+                          </>
+                        )}
+
+                        {(session.status === "completed" || session.status === "closed") && (
+                          <div className="grid grid-cols-2 gap-2 w-full">
+                            <Button
+                              size="sm"
+                              className="text-[11px] h-8 flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white"
+                              onClick={() => handleOpenAttendanceScreen(session)}
+                            >
+                              <UserCheck className="h-3.5 w-3.5" /> <span>Edit Attendance</span>
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={isPending}
+                              className="text-[11px] h-8 flex items-center space-x-1.5 border-amber-800/60 text-amber-400 hover:bg-amber-950/40"
+                              onClick={() => handleArchiveSession(session.id)}
+                            >
+                              <Archive className="h-3.5 w-3.5" /> <span>Archive</span>
+                            </Button>
+                          </div>
+                        )}
+
+                        {session.status === "paused" && (
+                          <Button
+                            size="sm"
+                            className="text-[11px] h-8 flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white w-full"
+                            onClick={() => handleOpenSession(session.id)}
+                          >
+                            <Play className="h-3.5 w-3.5" /> <span>Resume Session</span>
+                          </Button>
+                        )}
+                      </div>
                     </div>
-
-                    <div className="flex justify-between items-center text-xs text-muted-foreground pt-1">
-                      <span className="font-bold text-blue-400 flex items-center space-x-1">
-                        <Ribbon className="h-3.5 w-3.5 text-blue-400" />
-                        <span>{session.attendancePoints} Pts</span>
-                      </span>
-
-                      <span className="flex items-center space-x-1 text-slate-300 font-mono text-[11px]">
-                        <Users className="h-3.5 w-3.5 text-slate-400" />
-                        <span>{liveScansCount} Live Scans</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Session Action Controls matching Screenshot 1 */}
-                  <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-border/40">
-                    {session.status === "draft" && (
-                      <Button
-                        size="sm"
-                        className="text-[11px] h-8 flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white w-full"
-                        onClick={() => handleOpenSession(session.id)}
-                      >
-                        <Play className="h-3.5 w-3.5" /> <span>Start Session</span>
-                      </Button>
-                    )}
-
-                    {session.status === "active" && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={isPending}
-                          className="text-[11px] h-8 flex items-center space-x-1.5"
-                          onClick={() => handlePauseSession(session.id)}
-                        >
-                          <Pause className="h-3.5 w-3.5" /> <span>Pause</span>
-                        </Button>
-
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={isPending}
-                          className="text-[11px] h-8 flex items-center space-x-1.5 bg-red-600/90 hover:bg-red-600"
-                          onClick={() => handleCloseSession(session.id)}
-                        >
-                          <StopCircle className="h-3.5 w-3.5" /> <span>Close</span>
-                        </Button>
-
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={isPending}
-                          className="text-[11px] h-8 flex items-center space-x-1.5"
-                          onClick={() => handleManagePINs(session)}
-                        >
-                          <Key className="h-3.5 w-3.5 text-primary" /> <span>Manage PINs</span>
-                        </Button>
-
-                        <Button
-                          size="sm"
-                          disabled={isPending}
-                          className="text-[11px] h-8 flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white"
-                          onClick={() => handleOpenAttendanceScreen(session)}
-                        >
-                          <UserCheck className="h-3.5 w-3.5" /> <span>Take Attendance</span>
-                        </Button>
-
-                        <Button
-                          size="sm"
-                          disabled={isPending}
-                          className="text-[11px] h-8 flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-500 text-white"
-                          onClick={() => {
-                            setSelectedSession(session);
-                            setIsAuthOpen(true);
-                          }}
-                        >
-                          <Key className="h-3.5 w-3.5" /> <span>Authenticate</span>
-                        </Button>
-                      </>
-                    )}
-
-                    {session.status === "completed" && (
-                      <Button
-                        size="sm"
-                        className="text-[11px] h-8 flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white w-full"
-                        onClick={() => handleOpenAttendanceScreen(session)}
-                      >
-                        <UserCheck className="h-3.5 w-3.5" /> <span>Take / Edit Attendance</span>
-                      </Button>
-                    )}
-
-                    {session.status === "paused" && (
-                      <Button
-                        size="sm"
-                        className="text-[11px] h-8 flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white w-full"
-                        onClick={() => handleOpenSession(session.id)}
-                      >
-                        <Play className="h-3.5 w-3.5" /> <span>Resume Session</span>
-                      </Button>
-                    )}
-                  </div>
+                  );
+                })
+              )}
+            </div>
+          ) : (
+            /* Grid of Archived Sessions (Safe Rollback) */
+            <div className="space-y-4">
+              <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-4 text-xs text-amber-300 space-y-1">
+                <div className="font-bold flex items-center space-x-2">
+                  <Archive className="h-4 w-4 text-amber-400" />
+                  <span>Archived Sessions Safe Rollback Vault</span>
                 </div>
-              );
-            })}
-          </div>
+                <p className="text-muted-foreground leading-relaxed">
+                  Archived attendance sessions are isolated from active attendance, leaderboard calculations, analytics, and reports. All associated member points have been safely reversed. Click &quot;Restore Session&quot; at any time to return a session and its points back to live status.
+                </p>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {archivedSessions.length === 0 ? (
+                  <div className="col-span-full rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground text-xs">
+                    No archived sessions found. Completed sessions can be safely archived from the Active Sessions tab.
+                  </div>
+                ) : (
+                  archivedSessions.map((session) => {
+                    const scansCount = records.filter((r) => r.sessionId === session.id).length;
+                    return (
+                      <div
+                        key={session.id}
+                        className="rounded-2xl border border-amber-900/40 bg-card p-5 shadow-sm space-y-4 relative overflow-hidden flex flex-col justify-between"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div className="pr-2">
+                              <h4 className="font-bold text-foreground text-sm line-clamp-1">
+                                {session.title}
+                              </h4>
+                              <p className="text-[11px] text-muted-foreground mt-1 flex items-center space-x-2">
+                                <Clock className="h-3 w-3 shrink-0" />
+                                <span>
+                                  {new Date(session.date).toLocaleDateString("en-GB", {
+                                    day: "2-digit",
+                                    month: "short",
+                                    year: "numeric",
+                                  })}{" "}
+                                  • {session.startTime} - {session.endTime}
+                                </span>
+                              </p>
+                            </div>
+
+                            <Badge className="bg-amber-950/80 text-amber-400 border-amber-800/60 text-[10px] font-semibold px-2 py-0.5 rounded-full border uppercase">
+                              Archived
+                            </Badge>
+                          </div>
+
+                          <div className="flex justify-between items-center text-xs text-muted-foreground pt-1">
+                            <span className="font-bold text-amber-400/80 flex items-center space-x-1">
+                              <Ribbon className="h-3.5 w-3.5" />
+                              <span>{session.attendancePoints} Pts (Reversed)</span>
+                            </span>
+
+                            <span className="flex items-center space-x-1 text-slate-400 font-mono text-[11px]">
+                              <Users className="h-3.5 w-3.5" />
+                              <span>{scansCount} Records</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Restore & View Actions (Strictly No Delete) */}
+                        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border/40">
+                          <Button
+                            size="sm"
+                            disabled={isPending}
+                            className="text-[11px] h-8 flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                            onClick={() => handleRestoreSession(session.id)}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" /> <span>Restore Session</span>
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-[11px] h-8 flex items-center space-x-1.5"
+                            onClick={() => handleOpenAttendanceScreen(session)}
+                          >
+                            <Eye className="h-3.5 w-3.5" /> <span>View Records</span>
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Interactive Scan Attendance Checkin Form */}
           {authenticatedSessionId && (

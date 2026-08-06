@@ -5,7 +5,7 @@ import * as schema from "./schema";
 
 const connectionString =
   process.env.DATABASE_URL ||
-  "postgresql://postgres:Robotics%40club%402026@db.axaprqkzogwnchhikwyj.supabase.co:5432/postgres";
+  "postgresql://postgres.axaprqkzogwnchhikwyj:Robotics%40club%402026@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres";
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   process.env.SUPABASE_URL ||

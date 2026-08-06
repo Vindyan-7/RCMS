@@ -87,7 +87,8 @@ export class AttendanceReportService {
     // Query live attendance records joined with sessions and members
     const { data: recs, error } = await supabase
       .from("attendance_records")
-      .select("id, session_id, member_id, late, points, method, scan_time, volunteer_user, attendance_sessions(title, date), members(name, club_membership_id, member_id, roll_number, branch, year, status)")
+      .select("id, session_id, member_id, late, points, method, scan_time, volunteer_user, attendance_sessions!inner(title, date, status), members(name, club_membership_id, member_id, roll_number, branch, year, status)")
+      .neq("attendance_sessions.status", "archived")
       .order("scan_time", { ascending: false });
 
     if (error) {
@@ -141,7 +142,7 @@ export class AttendanceReportService {
     logger.info("[AttendanceReportService] Calculating Attendance Summary Report from live database");
 
     const [sessRes, memsRes, recsRes] = await Promise.all([
-      supabase.from("attendance_sessions").select("id, title, date").is("deleted_at", null),
+      supabase.from("attendance_sessions").select("id, title, date, status").neq("status", "archived").is("deleted_at", null),
       supabase.from("members").select("id, name, member_id, club_membership_id, branch, year").eq("status", "active").is("deleted_at", null),
       supabase.from("attendance_records").select("id, session_id, member_id, late, points"),
     ]);
