@@ -91,11 +91,11 @@ export function AttendanceClient({
       const { getAttendanceDashboardInitialDataAction } = await import("@/actions/attendance/attendance_sessions.actions");
       const res = await getAttendanceDashboardInitialDataAction();
       if (res.success && res.data) {
-        setSessions(res.data.sessions);
-        setArchivedSessions(res.data.archivedSessions);
-        setRecords(res.data.records);
-        setSemesterContext(res.data.semesterContext);
-        setEnrolledMembers(res.data.enrolledMembers);
+        if (res.data.sessions) setSessions(res.data.sessions);
+        if (res.data.archivedSessions) setArchivedSessions(res.data.archivedSessions);
+        if (res.data.records) setRecords(res.data.records);
+        if (res.data.semesterContext) setSemesterContext(res.data.semesterContext);
+        if (res.data.enrolledMembers && res.data.enrolledMembers.length > 0) setEnrolledMembers(res.data.enrolledMembers);
       }
     } catch {}
   }, []);

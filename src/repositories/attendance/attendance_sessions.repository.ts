@@ -84,7 +84,32 @@ export class AttendanceSessionsRepository extends BaseRepository<
     const offset = (page - 1) * limit;
 
     let items: AttendanceSessionSelect[] = [];
-    if (isServerless) {
+
+    // Strategy 1: Try Drizzle ORM first (Connection Pooler)
+    try {
+      const { ne } = require("drizzle-orm");
+      const conditions = [];
+      if (!options?.includeDeleted) {
+        conditions.push(isNull(attendanceSessions.deletedAt));
+      }
+      if (options?.onlyArchived) {
+        conditions.push(eq(attendanceSessions.status, "archived"));
+      } else if (!options?.includeArchived) {
+        conditions.push(ne(attendanceSessions.status, "archived"));
+      }
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      items = await db
+        .select()
+        .from(attendanceSessions)
+        .where(whereClause)
+        .limit(limit)
+        .offset(offset);
+    } catch (err) {
+      logger.error("[AttendanceSessionsRepository] Drizzle findAll error", err);
+    }
+
+    // Strategy 2: Fallback to Supabase REST API if Drizzle returned no items or errored
+    if (items.length === 0) {
       try {
         let req = supabase.from("attendance_sessions").select("*");
         if (!options?.includeDeleted) {
@@ -93,7 +118,7 @@ export class AttendanceSessionsRepository extends BaseRepository<
         if (options?.onlyArchived) {
           req = req.eq("status", "archived");
         } else if (!options?.includeArchived) {
-          req = req.neq("status", "archived");
+          req = req.or("status.neq.archived,status.is.null");
         }
         const { data } = await req;
         if (data && data.length > 0) {
@@ -101,46 +126,6 @@ export class AttendanceSessionsRepository extends BaseRepository<
         }
       } catch (err) {
         logger.error("[AttendanceSessionsRepository] REST query error", err);
-      }
-    } else {
-      try {
-        const { ne } = require("drizzle-orm");
-        const conditions = [];
-        if (!options?.includeDeleted) {
-          conditions.push(isNull(attendanceSessions.deletedAt));
-        }
-        if (options?.onlyArchived) {
-          conditions.push(eq(attendanceSessions.status, "archived"));
-        } else if (!options?.includeArchived) {
-          conditions.push(ne(attendanceSessions.status, "archived"));
-        }
-        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-        items = await db
-          .select()
-          .from(attendanceSessions)
-          .where(whereClause)
-          .limit(limit)
-          .offset(offset);
-      } catch (err) {
-        logger.error("[AttendanceSessionsRepository] Drizzle findAll error", err);
-      }
-
-      if (items.length === 0) {
-        try {
-          let req = supabase.from("attendance_sessions").select("*");
-          if (!options?.includeDeleted) {
-            req = req.is("deleted_at", null);
-          }
-          if (options?.onlyArchived) {
-            req = req.eq("status", "archived");
-          } else if (!options?.includeArchived) {
-            req = req.neq("status", "archived");
-          }
-          const { data } = await req;
-          if (data && data.length > 0) {
-            items = toCamelCase<AttendanceSessionSelect[]>(data);
-          }
-        } catch {}
       }
     }
 

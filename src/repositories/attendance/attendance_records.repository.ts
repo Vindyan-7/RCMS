@@ -197,7 +197,21 @@ export class AttendanceRecordsRepository {
     const offset = (page - 1) * limit;
 
     let items: AttendanceRecordSelect[] = [];
-    if (isServerless) {
+
+    // Strategy 1: Try Drizzle ORM first
+    try {
+      items = await db
+        .select()
+        .from(attendanceRecords)
+        .orderBy(desc(attendanceRecords.scanTime))
+        .limit(limit)
+        .offset(offset);
+    } catch (err) {
+      logger.error("[AttendanceRecordsRepository] Drizzle getAll error", err);
+    }
+
+    // Strategy 2: Fallback to Supabase REST API if Drizzle returned no items or errored
+    if (items.length === 0) {
       try {
         const { data } = await supabase
           .from("attendance_records")
@@ -208,29 +222,6 @@ export class AttendanceRecordsRepository {
         }
       } catch (err) {
         logger.error("[AttendanceRecordsRepository] REST query error", err);
-      }
-    } else {
-      try {
-        items = await db
-          .select()
-          .from(attendanceRecords)
-          .orderBy(desc(attendanceRecords.scanTime))
-          .limit(limit)
-          .offset(offset);
-      } catch (err) {
-        logger.error("[AttendanceRecordsRepository] Drizzle getAll error", err);
-      }
-
-      if (items.length === 0) {
-        try {
-          const { data } = await supabase
-            .from("attendance_records")
-            .select("*")
-            .order("scan_time", { ascending: false });
-          if (data && data.length > 0) {
-            items = toCamelCase<AttendanceRecordSelect[]>(data);
-          }
-        } catch {}
       }
     }
 

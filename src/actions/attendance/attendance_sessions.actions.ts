@@ -213,22 +213,28 @@ export async function getAttendanceDashboardInitialDataAction(): Promise<ApiResp
     const recordsRepo = new AttendanceRecordsRepository();
     const semesterContextService = new SemesterContextService();
 
-    const [sessRes, archRes, recsRes, metaRes, membersRes] = await Promise.all([
+    const results = await Promise.allSettled([
       sessionsService.getActiveSessions({ limit: 1000 }),
       sessionsService.getArchivedSessions({ limit: 1000 }),
       recordsRepo.getAll({ limit: 1000 }),
-      semesterContextService.getSemesterMetadata(),
-      semesterContextService.getEnrolledMembers(),
+      semesterContextService.getSemesterMetadata().catch(() => null),
+      semesterContextService.getEnrolledMembers().catch(() => []),
     ]);
+
+    const sessRes = results[0].status === "fulfilled" ? results[0].value : { items: [], total: 0, page: 1, limit: 1000, totalPages: 0 };
+    const archRes = results[1].status === "fulfilled" ? results[1].value : { items: [], total: 0, page: 1, limit: 1000, totalPages: 0 };
+    const recsRes = results[2].status === "fulfilled" ? results[2].value : { items: [], total: 0, page: 1, limit: 1000, totalPages: 0 };
+    const metaRes = results[3].status === "fulfilled" ? results[3].value : null;
+    const membersRes = results[4].status === "fulfilled" ? results[4].value : [];
 
     return {
       success: true,
       data: {
-        sessions: sessRes.items,
-        archivedSessions: archRes.items,
-        records: recsRes.items,
+        sessions: sessRes.items || [],
+        archivedSessions: archRes.items || [],
+        records: recsRes.items || [],
         semesterContext: metaRes,
-        enrolledMembers: membersRes,
+        enrolledMembers: membersRes || [],
       },
     };
   } catch (error) {
