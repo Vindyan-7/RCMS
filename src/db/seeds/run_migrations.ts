@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { seedProductionData } from "./production_init_seed";
 
-const connectionString = process.env.DATABASE_URL || "postgresql://postgres:Robotics%40club%402026@db.axaprqkzogwnchhikwyj.supabase.co:5432/postgres";
+const connectionString = process.env.DATABASE_URL || "";
 const sqlClient = postgres(connectionString);
 
 async function runAll() {

@@ -3,18 +3,16 @@ import postgres from "postgres";
 import { createClient } from "@supabase/supabase-js";
 import * as schema from "./schema";
 
-const connectionString =
-  process.env.DATABASE_URL ||
-  "postgresql://postgres.axaprqkzogwnchhikwyj:Robotics%40club%402026@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres";
+const connectionString = process.env.DATABASE_URL || "";
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   process.env.SUPABASE_URL ||
-  "https://axaprqkzogwnchhikwyj.supabase.co";
+  "";
 const supabaseKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.SUPABASE_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YXBycWt6b2d3bmNoaGlrd3lqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NTExODkzMCwiZXhwIjoyMTAwNjk0OTMwfQ.PGs5ytdpE9-0VK90-itxkuFZUg_1m6k0eU0jTixKHF8";
+  "";
 
 const client = postgres(connectionString, { prepare: false, ssl: "require" });
 export const drizzleDb = drizzle(client, { schema });
