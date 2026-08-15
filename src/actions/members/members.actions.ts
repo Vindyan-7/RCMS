@@ -368,14 +368,24 @@ export async function getMemberWorkspaceDataAction(memberId: string): Promise<Ap
     // Calculate total points
     const totalPoints = pointsEntries.reduce((sum: number, p: any) => sum + (p.points || 0), 0);
 
-    // Calculate total sessions
-    const { data: allSessions } = await supabase.from("attendance_sessions").select("id").neq("status", "archived").is("deleted_at", null);
-    const totalSessionsCount = allSessions ? allSessions.length : 1;
+    // Calculate total sessions (excluding draft and archived)
+    const { data: allSessions } = await supabase
+      .from("attendance_sessions")
+      .select("id")
+      .neq("status", "archived")
+      .neq("status", "draft")
+      .is("deleted_at", null);
+    const validSessionIds = new Set((allSessions || []).map((s: any) => s.id));
+    const totalSessionsCount = allSessions ? allSessions.length : 0;
 
-    const presentCount = attendanceRecords.length;
-    const lateCount = attendanceRecords.filter((r: any) => r.late).length;
+    const validAttendanceRecords = attendanceRecords.filter((r: any) =>
+      validSessionIds.has(r.attendance_sessions?.id || r.session_id)
+    );
+
+    const presentCount = validAttendanceRecords.length;
+    const lateCount = validAttendanceRecords.filter((r: any) => r.late).length;
     const absentCount = Math.max(0, totalSessionsCount - presentCount);
-    const attendanceRate = totalSessionsCount === 0 ? 0 : Math.round((presentCount / totalSessionsCount) * 100);
+    const attendanceRate = totalSessionsCount === 0 ? (presentCount > 0 ? 100 : 100) : Math.round((presentCount / totalSessionsCount) * 100);
 
     // Formatted Attendance Items
     const attendanceItems = attendanceRecords.map((r: any) => ({

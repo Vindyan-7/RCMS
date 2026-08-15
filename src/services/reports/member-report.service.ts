@@ -194,16 +194,18 @@ export class MemberReportService {
 
     const [memsRes, attSessRes, attRecsRes, ledgerRes, tasksRes, eventsRes] = await Promise.all([
       supabase.from("members").select("id, name, member_id, club_membership_id, branch, year").eq("status", "active").is("deleted_at", null),
-      supabase.from("attendance_sessions").select("id").is("deleted_at", null),
-      supabase.from("attendance_records").select("member_id, points, scan_time"),
+      supabase.from("attendance_sessions").select("id").neq("status", "archived").neq("status", "draft").is("deleted_at", null),
+      supabase.from("attendance_records").select("session_id, member_id, points, scan_time"),
       supabase.from("points_ledger").select("member_id, points, category, created_at"),
       supabase.from("task_completions").select("member_id, completed_at"),
       supabase.from("event_participations").select("member_id, verified_at"),
     ]);
 
     const members = memsRes.data || [];
-    const totalSessions = (attSessRes.data || []).length;
-    const attRecords = attRecsRes.data || [];
+    const validSessions = attSessRes.data || [];
+    const validSessionIdSet = new Set(validSessions.map((s: any) => s.id));
+    const totalSessions = validSessions.length;
+    const attRecords = (attRecsRes.data || []).filter((r: any) => validSessionIdSet.has(r.session_id));
     const ledger = ledgerRes.data || [];
     const tasks = tasksRes.data || [];
     const events = eventsRes.data || [];

@@ -78,7 +78,7 @@ export class DashboardService {
       try {
         const [mRes, sRes, rRes, tRes, eRes, iRes] = await Promise.all([
           supabase.from("members").select("status"),
-          supabase.from("attendance_sessions").select("id", { count: "exact" }),
+          supabase.from("attendance_sessions").select("id", { count: "exact" }).neq("status", "archived").neq("status", "draft").is("deleted_at", null),
           supabase.from("attendance_records").select("id", { count: "exact" }),
           supabase.from("task_completions").select("id", { count: "exact" }),
           supabase.from("events").select("id", { count: "exact" }),

@@ -105,6 +105,8 @@ export async function getPublicLeaderboardAction(): Promise<{
         .from("attendance_sessions")
         .select("id")
         .eq("semester_id", activeSemesterId)
+        .neq("status", "draft")
+        .neq("status", "archived")
         .is("deleted_at", null);
 
       sessionCount = sessData?.length || 0;
@@ -119,13 +121,24 @@ export async function getPublicLeaderboardAction(): Promise<{
       }
     }
 
-    if (recsData.length === 0) {
-      const [sessRes, recsRes] = await Promise.all([
-        supabase.from("attendance_sessions").select("id").is("deleted_at", null),
-        supabase.from("attendance_records").select("member_id"),
-      ]);
-      sessionCount = sessRes.data?.length || 0;
-      recsData = recsRes.data || [];
+    if (recsData.length === 0 && !activeSemesterId) {
+      const { data: sessRes } = await supabase
+        .from("attendance_sessions")
+        .select("id")
+        .neq("status", "draft")
+        .neq("status", "archived")
+        .is("deleted_at", null);
+
+      sessionCount = sessRes?.length || 0;
+      const validSessionIds = (sessRes || []).map((s: any) => s.id);
+
+      if (validSessionIds.length > 0) {
+        const { data: recsRes } = await supabase
+          .from("attendance_records")
+          .select("member_id")
+          .in("session_id", validSessionIds);
+        recsData = recsRes || [];
+      }
     }
 
     const presentMap: Record<string, number> = {};

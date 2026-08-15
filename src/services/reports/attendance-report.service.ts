@@ -142,14 +142,15 @@ export class AttendanceReportService {
     logger.info("[AttendanceReportService] Calculating Attendance Summary Report from live database");
 
     const [sessRes, memsRes, recsRes] = await Promise.all([
-      supabase.from("attendance_sessions").select("id, title, date, status").neq("status", "archived").is("deleted_at", null),
+      supabase.from("attendance_sessions").select("id, title, date, status").neq("status", "archived").neq("status", "draft").is("deleted_at", null),
       supabase.from("members").select("id, name, member_id, club_membership_id, branch, year").eq("status", "active").is("deleted_at", null),
       supabase.from("attendance_records").select("id, session_id, member_id, late, points"),
     ]);
 
     const sessions = sessRes.data || [];
+    const validSessionIdSet = new Set(sessions.map((s: any) => s.id));
     let members = memsRes.data || [];
-    const records = recsRes.data || [];
+    const records = (recsRes.data || []).filter((r: any) => validSessionIdSet.has(r.session_id));
 
     if (filters.branch && filters.branch !== "all") {
       members = members.filter((m: any) => m.branch && m.branch.toLowerCase() === filters.branch.toLowerCase());
