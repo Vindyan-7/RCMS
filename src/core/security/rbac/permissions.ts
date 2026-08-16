@@ -38,6 +38,10 @@ export const PERMISSIONS = {
   // Financial Permissions (Future Expansion)
   FINANCE_VIEW: "finance.view",
   FINANCE_MANAGE: "finance.manage",
+
+  // Freshers Campaign Permissions
+  CAMPAIGN_VIEW: "campaign.view",
+  CAMPAIGN_MANAGE: "campaign.manage",
 } as const;
 
 export type SystemPermission = typeof PERMISSIONS[keyof typeof PERMISSIONS];

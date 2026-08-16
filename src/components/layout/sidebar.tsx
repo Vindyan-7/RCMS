@@ -17,6 +17,7 @@ import {
   GraduationCap,
   Sparkles,
   FileSpreadsheet,
+  Gift,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,7 @@ const navigationItems = [
   { name: "Inventory", href: "/dashboard/inventory", icon: Box },
   { name: "Communication", href: "/dashboard/communication", icon: Bell },
   { name: "Team Studio", href: "/dashboard/team-studio", icon: Sparkles },
+  { name: "Freshers Campaign", href: "/dashboard/freshers", icon: Gift },
   { name: "Reports Center", href: "/dashboard/reports", icon: FileSpreadsheet },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];

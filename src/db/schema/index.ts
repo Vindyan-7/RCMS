@@ -60,3 +60,7 @@ export * from "./financial_transactions";
 export * from "./team_generations";
 export * from "./team_members";
 export * from "./member_collaborations";
+
+// Freshers Campaign Schemas
+export * from "./freshers_campaigns";
+export * from "./freshers_campaign_entries";
