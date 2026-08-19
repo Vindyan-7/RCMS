@@ -16,6 +16,7 @@ import { TeamStudioInitialResponse, AttendanceSessionSummary, PresentMemberItem 
 import { TeamAlgorithm, TeamGenerationResult, GeneratedTeam, GeneratedTeamMember } from "@/services/team-studio/team-generation.service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DetailDrawer } from "@/components/ui/detail-drawer";
 import {
   Sparkles,
   Users,
@@ -1221,9 +1222,14 @@ export function TeamStudioClient({ initialData }: TeamStudioClientProps) {
       )}
 
       {/* ── TEAM BUILDER WORKSPACE WITH PRESETS & FAVORITES ──────────────────── */}
-      {isTeamBuilderOpen && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex justify-end transition-opacity">
-          <div className="w-full max-w-4xl bg-card h-full border-l border-border shadow-2xl flex flex-col justify-between overflow-hidden text-left">
+      <DetailDrawer
+        isOpen={isTeamBuilderOpen}
+        onClose={() => setIsTeamBuilderOpen(false)}
+        title="Smart Team Builder Workspace"
+        maxWidth="max-w-4xl"
+      >
+        {isTeamBuilderOpen && (
+          <div className="flex flex-col h-full justify-between">
             <div className="p-6 border-b border-border flex items-center justify-between bg-card sticky top-0 z-10">
               <div className="flex items-center space-x-3">
                 <div className="h-10 w-10 rounded-xl bg-blue-950 text-blue-400 border border-blue-800/60 flex items-center justify-center text-xl font-bold">
@@ -1592,8 +1598,8 @@ export function TeamStudioClient({ initialData }: TeamStudioClientProps) {
               </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </DetailDrawer>
     </div>
   );
 }

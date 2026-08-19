@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -10,36 +10,12 @@ import {
   ShieldCheck,
   Menu,
   X,
-  LayoutDashboard,
-  Users,
-  CalendarCheck,
-  CheckSquare,
-  Award,
-  Box,
-  DollarSign,
-  BarChart3,
-  Settings,
-  GraduationCap,
   Bot,
   Clock,
 } from "lucide-react";
-import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-const navigationItems = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Members", href: "/dashboard/members", icon: Users },
-  { name: "Semesters", href: "/dashboard/semesters", icon: GraduationCap },
-  { name: "Attendance", href: "/dashboard/attendance", icon: CalendarCheck },
-  { name: "Operations", href: "/dashboard/operations", icon: CheckSquare },
-  { name: "Points Engine", href: "/dashboard/points", icon: Award },
-  { name: "Communication", href: "/dashboard/communication", icon: Bell },
-  { name: "Inventory", href: "/dashboard/inventory", icon: Box },
-  { name: "Finance", href: "/dashboard/finance", icon: DollarSign },
-  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
-];
+import { NAVIGATION_ITEMS } from "@/constants/navigation";
 
 export function Header() {
   const router = useRouter();
@@ -47,6 +23,7 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>("");
 
+  // Live 24-hour digital clock
   useEffect(() => {
     const updateClock = () => {
       const now = new Date();
@@ -59,6 +36,23 @@ export function Header() {
     const interval = setInterval(updateClock, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Lock body scroll when mobile menu is active
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [mobileMenuOpen]);
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   const handleLogout = async () => {
     try {
@@ -80,6 +74,7 @@ export function Header() {
             size="icon"
             className="lg:hidden text-foreground"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle navigation menu"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
@@ -128,50 +123,59 @@ export function Header() {
         </div>
       </header>
 
-      {/* Mobile Drawer Navigation */}
+      {/* Mobile Drawer Navigation (Full Responsive Overlay with Scroll Protection) */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden bg-background/95 backdrop-blur-lg p-6 flex flex-col space-y-6 overflow-y-auto">
-          <div className="flex items-center justify-between border-b border-border pb-4">
-            <div className="flex items-center space-x-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-                <Bot className="h-6 w-6" />
+        <div className="fixed inset-0 z-50 lg:hidden bg-background/98 backdrop-blur-xl p-5 sm:p-6 flex flex-col justify-between overflow-y-auto max-h-screen">
+          <div className="space-y-6 pb-8">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+                  <Bot className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-foreground">RCMS Core</h2>
+                  <p className="text-xs text-muted-foreground">Robotics Club System</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-base font-bold text-foreground">RCMS Core</h2>
-                <p className="text-xs text-muted-foreground">Robotics Club System</p>
-              </div>
+              <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)}>
+                <X className="h-6 w-6 text-foreground" />
+              </Button>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)}>
-              <X className="h-6 w-6" />
-            </Button>
+
+            <nav className="space-y-1">
+              {NAVIGATION_ITEMS.map((item) => {
+                const isActive =
+                  item.href === "/dashboard"
+                    ? pathname === "/dashboard"
+                    : pathname.startsWith(item.href);
+                const Icon = item.icon;
+
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={cn(
+                      "flex items-center rounded-xl px-4 py-3 text-sm font-medium transition-all active:scale-[0.98]",
+                      isActive
+                        ? "bg-primary text-primary-foreground font-bold shadow-md"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    <Icon className={cn("mr-3.5 h-5 w-5 shrink-0", isActive ? "text-primary-foreground" : "text-muted-foreground")} />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
+            </nav>
           </div>
 
-          <nav className="space-y-1">
-            {navigationItems.map((item) => {
-              const isActive =
-                item.href === "/dashboard"
-                  ? pathname === "/dashboard"
-                  : pathname.startsWith(item.href);
-              const Icon = item.icon;
-
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={cn(
-                    "flex items-center rounded-lg px-4 py-3 text-sm font-medium transition-all",
-                    isActive
-                      ? "bg-primary text-primary-foreground font-bold shadow-md"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  )}
-                >
-                  <Icon className="mr-3 h-5 w-5" />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </nav>
+          <div className="border-t border-border pt-4 text-xs text-muted-foreground pb-6">
+            <div className="px-2 font-mono font-semibold text-foreground">RCMS v1.0 Release Candidate</div>
+            <div className="px-2 text-[11px] text-muted-foreground/70">
+              Robotics Club Management System
+            </div>
+          </div>
         </div>
       )}
     </>

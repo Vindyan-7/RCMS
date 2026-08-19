@@ -11,11 +11,10 @@ import {
   Star,
   CheckCircle2,
   AlertCircle,
-  Cpu,
-  ChevronDown,
   ShieldCheck,
   Home,
   Send,
+  ChevronDown,
 } from "lucide-react";
 import { PublicHeader } from "@/components/public/public-header";
 import { PublicFooter } from "@/components/public/public-footer";
@@ -34,6 +33,7 @@ interface FreshersPublicClientProps {
 
 export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
+  const [registeredData, setRegisteredData] = useState<{ fullName?: string } | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
@@ -52,8 +52,14 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(storageKey);
-      if (stored === "true") {
+      if (stored) {
         setAlreadyRegistered(true);
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed === "object" && parsed.fullName) {
+            setRegisteredData({ fullName: parsed.fullName });
+          }
+        } catch {}
       }
     } catch {}
   }, [storageKey]);
@@ -62,7 +68,8 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
     e.preventDefault();
     setErrorMessage("");
 
-    if (!fullName.trim() || fullName.trim().length < 2) {
+    const nameToSubmit = fullName.trim();
+    if (!nameToSubmit || nameToSubmit.length < 2) {
       setErrorMessage("Please enter a valid full name.");
       return;
     }
@@ -82,7 +89,7 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
 
     try {
       const res = await submitFreshersCampaignEntryAction({
-        fullName: fullName.trim(),
+        fullName: nameToSubmit,
         mobileNumber: cleanMobile,
         stallRating,
         feedback: feedback.trim() || undefined,
@@ -91,9 +98,11 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
       const resData = res.data;
 
       if (res.success && resData?.status === "registered") {
+        const dataToStore = { fullName: nameToSubmit };
         try {
-          localStorage.setItem(storageKey, "true");
+          localStorage.setItem(storageKey, JSON.stringify(dataToStore));
         } catch {}
+        setRegisteredData(dataToStore);
         setSubmittedSuccess(true);
       } else if (resData?.status === "already_registered") {
         try {
@@ -180,10 +189,18 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
               </p>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center space-y-1">
-              <p className="text-xs font-semibold text-slate-800">SVCE Robotics Club</p>
-              <p className="text-[11px] text-slate-500">Thank you for connecting with the Robotics Club!</p>
-            </div>
+            {registeredData?.fullName ? (
+              <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 text-center space-y-1 shadow-2xs">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">Registered Student</p>
+                <p className="text-lg font-black text-slate-900">{registeredData.fullName}</p>
+                <p className="text-[11px] text-slate-500 pt-0.5">SVCE Robotics Club Freshers Campaign</p>
+              </div>
+            ) : (
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center space-y-1">
+                <p className="text-xs font-semibold text-slate-800">SVCE Robotics Club</p>
+                <p className="text-[11px] text-slate-500">Thank you for connecting with the Robotics Club!</p>
+              </div>
+            )}
 
             <div className="pt-2 flex flex-col gap-3">
               <Link
@@ -217,6 +234,7 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
                     localStorage.removeItem(storageKey);
                   } catch {}
                   setAlreadyRegistered(false);
+                  setRegisteredData(null);
                 }}
                 className="text-[11px] font-semibold text-blue-600 hover:underline pt-2"
               >
@@ -254,9 +272,10 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
               </p>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center space-y-1">
-              <p className="text-xs font-semibold text-slate-800">You are now part of the Freshers Lucky Draw.</p>
-              <p className="text-[11px] text-slate-500">Keep an eye out for draw announcements and club activities!</p>
+            <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 text-center space-y-1 shadow-2xs">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Registered Student</p>
+              <p className="text-lg font-black text-slate-900">{registeredData?.fullName || fullName}</p>
+              <p className="text-[11px] text-slate-500 pt-0.5">You are now part of the Freshers Lucky Draw.</p>
             </div>
 
             <div className="pt-2 flex flex-col gap-3">

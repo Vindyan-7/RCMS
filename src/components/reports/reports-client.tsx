@@ -12,6 +12,7 @@ import { ReportCenterInitialResponse, ReportCategoryItem, ReportPreviewResult, R
 import { ReportExportService } from "@/services/reports/report-export.service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DetailDrawer } from "@/components/ui/detail-drawer";
 import {
   FileSpreadsheet,
   FileText,
@@ -415,14 +416,14 @@ export function ReportsClient({ initialData }: ReportsClientProps) {
       </div>
 
       {/* ── CATEGORY TEMPLATES DRAWER (SLIDE-OVER PANEL) ────────────────────── */}
-      {selectedCategory && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex justify-end transition-opacity">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${selectedCategory.title} templates`}
-            className="w-full max-w-xl bg-card h-full border-l border-border shadow-2xl flex flex-col justify-between overflow-hidden text-left"
-          >
+      <DetailDrawer
+        isOpen={Boolean(selectedCategory)}
+        onClose={() => setSelectedCategory(null)}
+        title={selectedCategory ? `${selectedCategory.title} templates` : "Category Templates"}
+        maxWidth="max-w-xl"
+      >
+        {selectedCategory && (
+          <div className="flex flex-col h-full justify-between">
             <div className="p-6 border-b border-border flex items-center justify-between bg-card sticky top-0 z-10">
               <div className="flex items-center space-x-3">
                 <div className="h-10 w-10 rounded-xl bg-blue-950 text-blue-400 border border-blue-800/60 flex items-center justify-center text-xl font-bold">
@@ -503,18 +504,18 @@ export function ReportsClient({ initialData }: ReportsClientProps) {
               </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </DetailDrawer>
 
       {/* ── REPORT PREVIEW DRAWER (FULL PREVIEW WORKSPACE + UNIVERSAL EXPORT TOOLBAR) ── */}
-      {previewResult && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex justify-end transition-opacity">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${previewResult.title} preview`}
-            className="w-full max-w-4xl bg-card h-full border-l border-border shadow-2xl flex flex-col justify-between overflow-hidden text-left"
-          >
+      <DetailDrawer
+        isOpen={Boolean(previewResult)}
+        onClose={() => setPreviewResult(null)}
+        title={previewResult ? `${previewResult.title} preview` : "Report Preview"}
+        maxWidth="max-w-4xl"
+      >
+        {previewResult && (
+          <div className="flex flex-col h-full justify-between">
             {/* Header */}
             <div className="p-6 border-b border-border flex items-center justify-between bg-card sticky top-0 z-10">
               <div className="flex items-center space-x-3">
@@ -692,8 +693,8 @@ export function ReportsClient({ initialData }: ReportsClientProps) {
               </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </DetailDrawer>
     </div>
   );
 }

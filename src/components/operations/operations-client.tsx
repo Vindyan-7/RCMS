@@ -33,6 +33,7 @@ import { SemesterContextMetadata } from "@/services/academic/semester-context.se
 import { EventSelect, TaskSelect, MemberSelect } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DetailDrawer } from "@/components/ui/detail-drawer";
 import {
   Calendar,
   CheckSquare,
@@ -522,9 +523,15 @@ export function OperationsClient({ initialEvents, initialTasks }: OperationsClie
       )}
 
       {/* ── TASK DETAIL WORKSPACE SLIDE-OVER PANEL ───────────────────────────── */}
-      {activeDetailTask && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-2xl bg-card border-l border-border h-full overflow-y-auto p-6 shadow-2xl space-y-6 animate-in slide-in-from-right duration-200">
+      <DetailDrawer
+        isOpen={Boolean(activeDetailTask)}
+        onClose={() => setActiveDetailTask(null)}
+        title="Task Detail Workspace"
+        maxWidth="max-w-2xl"
+        className="p-6 space-y-6"
+      >
+        {activeDetailTask && (
+          <div>
             {/* Top Workspace Header */}
             <div className="flex justify-between items-start border-b border-border pb-4">
               <div className="space-y-1">
@@ -688,13 +695,19 @@ export function OperationsClient({ initialEvents, initialTasks }: OperationsClie
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </DetailDrawer>
 
       {/* ── EVENT DETAIL WORKSPACE SLIDE-OVER PANEL ──────────────────────────── */}
-      {activeDetailEvent && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-2xl bg-card border-l border-border h-full overflow-y-auto p-6 shadow-2xl space-y-6 animate-in slide-in-from-right duration-200">
+      <DetailDrawer
+        isOpen={Boolean(activeDetailEvent)}
+        onClose={() => setActiveDetailEvent(null)}
+        title="Event Detail Workspace"
+        maxWidth="max-w-2xl"
+        className="p-6 space-y-6"
+      >
+        {activeDetailEvent && (
+          <div>
             {/* Top Workspace Header */}
             <div className="flex justify-between items-start border-b border-border pb-4">
               <div className="space-y-1">
@@ -850,8 +863,8 @@ export function OperationsClient({ initialEvents, initialTasks }: OperationsClie
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </DetailDrawer>
 
       {/* Create Event Modal */}
       {isCreateEventOpen && (

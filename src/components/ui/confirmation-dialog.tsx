@@ -1,4 +1,7 @@
-import * as React from "react";
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, X } from "lucide-react";
@@ -26,16 +29,50 @@ export function ConfirmationDialog({
   variant = "destructive",
   isLoading = false,
 }: ConfirmationDialogProps) {
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
 
-  return (
-    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Lock body scroll when dialog is active
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
+  // Keyboard listener for Escape key to close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen && !isLoading) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isLoading, onClose]);
+
+  if (!isOpen || !mounted) return null;
+
+  const dialogContent = (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 top-0 bottom-0 left-0 right-0 z-[9999] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+      style={{ top: 0, right: 0, bottom: 0, left: 0, zIndex: 9999 }}
+    >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirmation-title"
         aria-describedby="confirmation-desc"
-        className="w-full max-w-md bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-5 text-left"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-5 text-left animate-in zoom-in-95 duration-150 relative z-[10000]"
       >
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-3">
@@ -83,4 +120,6 @@ export function ConfirmationDialog({
       </div>
     </div>
   );
+
+  return createPortal(dialogContent, document.body);
 }

@@ -2,41 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Users,
-  CalendarCheck,
-  CheckSquare,
-  Award,
-  Bell,
-  Box,
-  DollarSign,
-  BarChart3,
-  Settings,
-  Bot,
-  GraduationCap,
-  Sparkles,
-  FileSpreadsheet,
-  Gift,
-} from "lucide-react";
+import { Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const navigationItems = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Members", href: "/dashboard/members", icon: Users },
-  { name: "Semesters", href: "/dashboard/semesters", icon: GraduationCap },
-  { name: "Attendance", href: "/dashboard/attendance", icon: CalendarCheck },
-  { name: "Operations", href: "/dashboard/operations", icon: CheckSquare },
-  { name: "Points Engine", href: "/dashboard/points", icon: Award },
-  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-  { name: "Finance", href: "/dashboard/finance", icon: DollarSign },
-  { name: "Inventory", href: "/dashboard/inventory", icon: Box },
-  { name: "Communication", href: "/dashboard/communication", icon: Bell },
-  { name: "Team Studio", href: "/dashboard/team-studio", icon: Sparkles },
-  { name: "Freshers Campaign", href: "/dashboard/freshers", icon: Gift },
-  { name: "Reports Center", href: "/dashboard/reports", icon: FileSpreadsheet },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
-];
+import { NAVIGATION_ITEMS } from "@/constants/navigation";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -44,7 +12,7 @@ export function Sidebar() {
   return (
     <aside className="hidden lg:flex fixed left-0 top-0 z-40 h-screen w-64 border-r border-border bg-card/80 backdrop-blur-md transition-transform flex-col">
       <div className="flex h-full flex-col justify-between px-4 py-6">
-        <div className="space-y-6">
+        <div className="space-y-6 overflow-y-auto">
           {/* Logo & Branding */}
           <div className="flex items-center space-x-3 px-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
@@ -62,7 +30,7 @@ export function Sidebar() {
 
           {/* Navigation Links */}
           <nav className="space-y-1">
-            {navigationItems.map((item) => {
+            {NAVIGATION_ITEMS.map((item) => {
               const isActive =
                 item.href === "/dashboard"
                   ? pathname === "/dashboard"

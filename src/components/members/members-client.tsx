@@ -22,6 +22,7 @@ import { renewMembershipAction } from "@/actions/members/memberships.actions";
 import { MemberSelect } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DetailDrawer } from "@/components/ui/detail-drawer";
 import {
   Search,
   Plus,
@@ -572,9 +573,17 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
       </div>
 
       {/* ── CONSOLIDATED MEMBER WORKSPACE SLIDE-OVER PANEL ──────────────────── */}
-      {activeWorkspaceMember && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-3xl bg-card border-l border-border h-full overflow-y-auto shadow-2xl animate-in slide-in-from-right duration-200 flex flex-col">
+      <DetailDrawer
+        isOpen={Boolean(activeWorkspaceMember)}
+        onClose={() => {
+          setActiveWorkspaceMember(null);
+          setWorkspaceData(null);
+        }}
+        title="Member Intelligence Workspace"
+        maxWidth="max-w-3xl"
+      >
+        {activeWorkspaceMember && (
+          <div className="flex flex-col h-full">
             
             {/* 1. Sticky Workspace Header & Quick Activity Dashboard (Phase 1) */}
             <div className="sticky top-0 z-20 bg-card/95 backdrop-blur-md border-b border-border p-5 space-y-4 shadow-sm">
@@ -1100,8 +1109,8 @@ export function MembersClient({ initialMembers }: MembersClientProps) {
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </DetailDrawer>
 
       {/* Add Member Modal */}
       {isAddModalOpen && (

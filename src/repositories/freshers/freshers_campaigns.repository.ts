@@ -2,8 +2,9 @@
  * Freshers Domain - Freshers Campaigns Repository
  */
 
-import { db, supabase, toCamelCase, toSnakeCase } from "@/db";
-import { FreshersCampaignSelect, FreshersCampaignInsert } from "@/db/schema";
+import { eq, and, isNull, desc } from "drizzle-orm";
+import { drizzleDb, supabase, toCamelCase, toSnakeCase } from "@/db";
+import { freshersCampaigns, FreshersCampaignSelect, FreshersCampaignInsert } from "@/db/schema";
 import { BaseRepository } from "@/core/repository/base-repository";
 import { PaginatedResult, QueryOptions } from "@/core/repository/repository.types";
 import { UUID, PaginationQuery } from "@/core/types";
@@ -20,14 +21,30 @@ export class FreshersCampaignsRepository extends BaseRepository<
 
   public async findById(id: UUID, options?: { includeDeleted?: boolean }): Promise<FreshersCampaignSelect | null> {
     try {
+      const conditions = [eq(freshersCampaigns.id, id)];
+      if (!options?.includeDeleted) {
+        conditions.push(isNull(freshersCampaigns.deletedAt));
+      }
+      const rows = await drizzleDb
+        .select()
+        .from(freshersCampaigns)
+        .where(and(...conditions))
+        .limit(1);
+
+      if (rows && rows[0]) return rows[0];
+    } catch (err: any) {
+      logger.warn("[FreshersCampaignsRepository] Drizzle findById error, falling back to Supabase", { message: err?.message });
+    }
+
+    try {
       let query = supabase.from("freshers_campaigns").select("*").eq("id", id);
       if (!options?.includeDeleted) {
         query = query.is("deleted_at", null);
       }
       const { data } = await query.limit(1);
       if (data && data[0]) return toCamelCase<FreshersCampaignSelect>(data[0]);
-    } catch (err) {
-      logger.error("[FreshersCampaignsRepository] findById error", err);
+    } catch (err: any) {
+      logger.error("[FreshersCampaignsRepository] findById error", { message: err?.message });
     }
     return null;
   }
@@ -39,9 +56,30 @@ export class FreshersCampaignsRepository extends BaseRepository<
     const page = query.page || 1;
     const limit = query.limit || 10;
     const from = (page - 1) * limit;
-    const to = from + limit - 1;
 
     try {
+      const rows = await drizzleDb
+        .select()
+        .from(freshersCampaigns)
+        .where(isNull(freshersCampaigns.deletedAt))
+        .orderBy(desc(freshersCampaigns.createdAt));
+
+      const total = rows.length;
+      const items = rows.slice(from, from + limit);
+
+      return {
+        items,
+        total,
+        page,
+        limit,
+        totalPages: this.calculateTotalPages(total, limit),
+      };
+    } catch (err: any) {
+      logger.warn("[FreshersCampaignsRepository] Drizzle findAll fallback to Supabase", { message: err?.message });
+    }
+
+    try {
+      const to = from + limit - 1;
       let req = supabase
         .from("freshers_campaigns")
         .select("*", { count: "exact" })
@@ -60,16 +98,30 @@ export class FreshersCampaignsRepository extends BaseRepository<
         limit,
         totalPages: this.calculateTotalPages(total, limit),
       };
-    } catch (err) {
-      logger.error("[FreshersCampaignsRepository] findAll error", err);
+    } catch (err: any) {
+      logger.error("[FreshersCampaignsRepository] findAll error", { message: err?.message });
       return { items: [], total: 0, page, limit, totalPages: 1 };
     }
   }
 
   public async create(data: FreshersCampaignInsert, creatorId: UUID): Promise<FreshersCampaignSelect> {
+    try {
+      const [result] = await drizzleDb
+        .insert(freshersCampaigns)
+        .values({
+          ...data,
+          createdBy: creatorId,
+          updatedBy: creatorId,
+        })
+        .returning();
+
+      if (result) return result;
+    } catch (err: any) {
+      logger.warn("[FreshersCampaignsRepository] Drizzle create fallback to Supabase", { message: err?.message });
+    }
+
     const payload = toSnakeCase({
       ...data,
-
       created_by: creatorId,
       updated_by: creatorId,
     });
@@ -81,7 +133,7 @@ export class FreshersCampaignsRepository extends BaseRepository<
       .single();
 
     if (error || !result) {
-      logger.error("[FreshersCampaignsRepository] create error", error);
+      logger.error("[FreshersCampaignsRepository] create error", { message: error?.message });
       throw new Error(error?.message || "Failed to create campaign record.");
     }
 
@@ -93,9 +145,24 @@ export class FreshersCampaignsRepository extends BaseRepository<
     data: Partial<FreshersCampaignInsert>,
     updaterId: UUID
   ): Promise<FreshersCampaignSelect> {
+    try {
+      const [result] = await drizzleDb
+        .update(freshersCampaigns)
+        .set({
+          ...data,
+          updatedBy: updaterId,
+          updatedAt: new Date().toISOString() as any,
+        })
+        .where(eq(freshersCampaigns.id, id))
+        .returning();
+
+      if (result) return result;
+    } catch (err: any) {
+      logger.warn("[FreshersCampaignsRepository] Drizzle update fallback to Supabase", { message: err?.message });
+    }
+
     const payload = toSnakeCase({
       ...data,
-
       updated_by: updaterId,
       updated_at: new Date().toISOString(),
     });
@@ -108,7 +175,7 @@ export class FreshersCampaignsRepository extends BaseRepository<
       .single();
 
     if (error || !result) {
-      logger.error("[FreshersCampaignsRepository] update error", error);
+      logger.error("[FreshersCampaignsRepository] update error", { message: error?.message });
       throw new Error(error?.message || "Failed to update campaign record.");
     }
 
@@ -116,6 +183,19 @@ export class FreshersCampaignsRepository extends BaseRepository<
   }
 
   public async delete(id: UUID, deleterId: UUID): Promise<boolean> {
+    try {
+      await drizzleDb
+        .update(freshersCampaigns)
+        .set({
+          deletedAt: new Date().toISOString() as any,
+          updatedBy: deleterId,
+        })
+        .where(eq(freshersCampaigns.id, id));
+      return true;
+    } catch (err: any) {
+      logger.warn("[FreshersCampaignsRepository] Drizzle delete fallback", { message: err?.message });
+    }
+
     const { error } = await supabase
       .from("freshers_campaigns")
       .update({ deleted_at: new Date().toISOString(), updated_by: deleterId })
@@ -124,11 +204,31 @@ export class FreshersCampaignsRepository extends BaseRepository<
   }
 
   public async purge(id: UUID): Promise<boolean> {
+    try {
+      await drizzleDb.delete(freshersCampaigns).where(eq(freshersCampaigns.id, id));
+      return true;
+    } catch (err: any) {
+      logger.warn("[FreshersCampaignsRepository] Drizzle purge fallback", { message: err?.message });
+    }
+
     const { error } = await supabase.from("freshers_campaigns").delete().eq("id", id);
     return !error;
   }
 
   public async findActiveCampaign(): Promise<FreshersCampaignSelect | null> {
+    try {
+      const rows = await drizzleDb
+        .select()
+        .from(freshersCampaigns)
+        .where(and(eq(freshersCampaigns.status, "active"), isNull(freshersCampaigns.deletedAt)))
+        .orderBy(desc(freshersCampaigns.createdAt))
+        .limit(1);
+
+      if (rows && rows[0]) return rows[0];
+    } catch (err: any) {
+      logger.warn("[FreshersCampaignsRepository] Drizzle findActiveCampaign fallback to Supabase", { message: err?.message });
+    }
+
     try {
       const { data } = await supabase
         .from("freshers_campaigns")
@@ -138,13 +238,25 @@ export class FreshersCampaignsRepository extends BaseRepository<
         .order("created_at", { ascending: false })
         .limit(1);
       if (data && data[0]) return toCamelCase<FreshersCampaignSelect>(data[0]);
-    } catch (err) {
-      logger.error("[FreshersCampaignsRepository] Error fetching active campaign", err);
+    } catch (err: any) {
+      logger.error("[FreshersCampaignsRepository] Error fetching active campaign", { message: err?.message });
     }
     return null;
   }
 
   public async findByKey(campaignKey: string): Promise<FreshersCampaignSelect | null> {
+    try {
+      const rows = await drizzleDb
+        .select()
+        .from(freshersCampaigns)
+        .where(and(eq(freshersCampaigns.campaignKey, campaignKey), isNull(freshersCampaigns.deletedAt)))
+        .limit(1);
+
+      if (rows && rows[0]) return rows[0];
+    } catch (err: any) {
+      logger.warn("[FreshersCampaignsRepository] Drizzle findByKey fallback to Supabase", { message: err?.message });
+    }
+
     try {
       const { data } = await supabase
         .from("freshers_campaigns")
@@ -153,8 +265,8 @@ export class FreshersCampaignsRepository extends BaseRepository<
         .is("deleted_at", null)
         .limit(1);
       if (data && data[0]) return toCamelCase<FreshersCampaignSelect>(data[0]);
-    } catch (err) {
-      logger.error("[FreshersCampaignsRepository] Error fetching campaign by key", err);
+    } catch (err: any) {
+      logger.error("[FreshersCampaignsRepository] Error fetching campaign by key", { message: err?.message });
     }
     return null;
   }

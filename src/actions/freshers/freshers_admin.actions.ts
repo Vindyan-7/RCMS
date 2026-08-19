@@ -88,7 +88,7 @@ export async function executeLuckyDrawAction(prizeTier: string = "Tier A - Welco
     const actor = await getAdminActorContext();
     Authorizer.hasPermission(actor, PERMISSIONS.CAMPAIGN_MANAGE);
 
-    const winner = await freshersService.executeLuckyDraw(actor.id, prizeTier);
+    const winner = await freshersService.executeLuckyDraw(prizeTier, actor.id);
     return {
       success: true,
       data: winner,

@@ -27,6 +27,7 @@ import {
   convertCampaignEntryToMemberAction,
 } from "@/actions/freshers/freshers_admin.actions";
 import { FreshersCampaignSelect, FreshersCampaignEntrySelect } from "@/db/schema";
+import { DetailDrawer } from "@/components/ui/detail-drawer";
 
 interface FreshersAdminClientProps {
   initialData: {
@@ -136,6 +137,25 @@ export function FreshersAdminClient({ initialData }: FreshersAdminClientProps) {
       setConvertLoading(false);
     }
   };
+
+  const filteredEntries = data.entries.filter((entry) => {
+    if (ratingFilter !== "all" && entry.stallRating !== Number(ratingFilter)) {
+      return false;
+    }
+    if (drawStatusFilter !== "all" && entry.drawStatus !== drawStatusFilter) {
+      return false;
+    }
+    if (statusFilter !== "all" && entry.status !== statusFilter) {
+      return false;
+    }
+    if (search.trim()) {
+      const term = search.trim().toLowerCase();
+      const matchName = entry.fullName.toLowerCase().includes(term);
+      const matchMobile = entry.mobileNumber.toLowerCase().includes(term);
+      if (!matchName && !matchMobile) return false;
+    }
+    return true;
+  });
 
   const activeCampaign = data.activeCampaign;
   const stats = data.stats;
@@ -299,7 +319,7 @@ export function FreshersAdminClient({ initialData }: FreshersAdminClientProps) {
               className="inline-flex items-center justify-center space-x-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2.5 text-xs font-bold text-slate-950 shadow-md hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 transition-all active:scale-95"
             >
               <Gift className={`h-4 w-4 ${drawingWinner ? "animate-bounce" : ""}`} />
-              <span>{drawingWinner ? "Selecting Winner..." : "Draw Winner 🎲"}</span>
+              <span>{drawingWinner ? "Drawing Winner..." : "Draw Winner 🎲"}</span>
             </button>
           </div>
         </div>
@@ -310,23 +330,26 @@ export function FreshersAdminClient({ initialData }: FreshersAdminClientProps) {
           </div>
         )}
 
-        {/* Revealed Winner High-Tech Reveal Card */}
+        {/* Revealed Winner Celebration Banner */}
         {revealedWinner && (
-          <div className="bg-gradient-to-r from-slate-900 via-amber-950/40 to-slate-900 border border-amber-500/50 rounded-2xl p-6 text-center space-y-4 shadow-xl animate-in zoom-in-95 duration-300">
-            <div className="inline-flex items-center space-x-2 rounded-full bg-amber-500/20 border border-amber-500/40 px-3.5 py-1 text-xs font-black text-amber-400 uppercase tracking-widest">
-              <Trophy className="h-3.5 w-3.5 text-amber-400" />
-              <span>WINNER SELECTED — POSITION #{revealedWinner.winnerPosition}</span>
+          <div className="rounded-2xl bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-blue-500/10 border border-amber-500/30 p-6 text-center space-y-4 animate-in fade-in zoom-in duration-300">
+            <div className="inline-flex items-center space-x-2 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-extrabold text-amber-500 uppercase tracking-wider">
+              <Trophy className="h-4 w-4" />
+              <span>Winner Announced! Position #{revealedWinner.winnerPosition}</span>
             </div>
 
             <div className="space-y-1">
-              <h3 className="text-3xl font-black text-white">{revealedWinner.fullName}</h3>
-              <p className="text-sm font-mono text-amber-300">Mobile: {revealedWinner.mobileNumber}</p>
-              <p className="text-xs text-slate-300 font-semibold">Prize: {revealedWinner.prizeTier}</p>
+              <h3 className="text-2xl sm:text-3xl font-black text-foreground">{revealedWinner.fullName}</h3>
+              <p className="text-xs font-mono text-muted-foreground">Mobile: {revealedWinner.mobileNumber}</p>
+            </div>
+
+            <div className="inline-block rounded-xl bg-background border border-border px-4 py-2 text-xs font-semibold text-primary">
+              Prize: <span className="font-bold">{revealedWinner.prizeTier || selectedPrizeTier}</span>
             </div>
           </div>
         )}
 
-        {/* Winner Audit Table */}
+        {/* Winner History Table */}
         {data.winners.length > 0 && (
           <div className="space-y-3 pt-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Winner Audit Log</h3>
@@ -362,7 +385,7 @@ export function FreshersAdminClient({ initialData }: FreshersAdminClientProps) {
       <div className="bg-card border border-border rounded-2xl p-6 space-y-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Campaign Registrations ({data.total})</h2>
+            <h2 className="text-lg font-bold text-foreground">Campaign Registrations ({filteredEntries.length})</h2>
             <p className="text-xs text-muted-foreground">Filter, inspect, and convert fresher entries</p>
           </div>
 
@@ -383,9 +406,7 @@ export function FreshersAdminClient({ initialData }: FreshersAdminClientProps) {
             {/* Rating Filter */}
             <select
               value={ratingFilter}
-              onChange={(e) => {
-                setRatingFilter(e.target.value);
-              }}
+              onChange={(e) => setRatingFilter(e.target.value)}
               className="rounded-xl bg-background border border-border px-3 py-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="all">All Ratings</option>
@@ -399,9 +420,7 @@ export function FreshersAdminClient({ initialData }: FreshersAdminClientProps) {
             {/* Draw Status Filter */}
             <select
               value={drawStatusFilter}
-              onChange={(e) => {
-                setDrawStatusFilter(e.target.value);
-              }}
+              onChange={(e) => setDrawStatusFilter(e.target.value)}
               className="rounded-xl bg-background border border-border px-3 py-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="all">All Draw Statuses</option>
@@ -435,14 +454,14 @@ export function FreshersAdminClient({ initialData }: FreshersAdminClientProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border font-medium">
-              {data.entries.length === 0 ? (
+              {filteredEntries.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                     No fresher campaign entries found matching filters.
                   </td>
                 </tr>
               ) : (
-                data.entries.map((entry) => (
+                filteredEntries.map((entry) => (
                   <tr
                     key={entry.id}
                     onClick={() => setSelectedEntry(entry)}
@@ -506,9 +525,15 @@ export function FreshersAdminClient({ initialData }: FreshersAdminClientProps) {
       </div>
 
       {/* RCMS SLIDE-OVER WORKSPACE DRAWER */}
-      {selectedEntry && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-card border-l border-border h-full p-6 space-y-6 overflow-y-auto shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-200">
+      <DetailDrawer
+        isOpen={Boolean(selectedEntry)}
+        onClose={() => setSelectedEntry(null)}
+        title="Entry Workspace"
+        maxWidth="max-w-md"
+        className="p-6"
+      >
+        {selectedEntry && (
+          <>
             <div className="space-y-6">
               <div className="flex items-center justify-between border-b border-border pb-4">
                 <div className="flex items-center space-x-2">
@@ -519,6 +544,7 @@ export function FreshersAdminClient({ initialData }: FreshersAdminClientProps) {
                 </div>
                 <button
                   onClick={() => setSelectedEntry(null)}
+                  aria-label="Close"
                   className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
                 >
                   <X className="h-5 w-5" />
@@ -597,9 +623,9 @@ export function FreshersAdminClient({ initialData }: FreshersAdminClientProps) {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </DetailDrawer>
     </div>
   );
 }
