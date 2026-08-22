@@ -3,7 +3,52 @@ import postgres from "postgres";
 import { createClient } from "@supabase/supabase-js";
 import * as schema from "./schema";
 
-const connectionString = process.env.DATABASE_URL || "";
+/**
+ * Sanitizes connection string to ensure IPv4 pooler compatibility on Vercel / serverless deployments.
+ * Direct Supabase host "db.<ref>.supabase.co:5432" is IPv6-only and fails with ENOTFOUND on Vercel.
+ * Transformed to Supavisor Pooler "aws-0-[region].pooler.supabase.com:6543" with user "postgres.<ref>".
+ */
+function getSanitizedConnectionString(): string {
+  let rawUrl =
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.SUPABASE_DATABASE_URL ||
+    "";
+
+  if (!rawUrl) return "";
+
+  if (rawUrl.includes("db.axaprqkzogwnchhikwyj.supabase.co")) {
+    rawUrl = rawUrl
+      .replace("db.axaprqkzogwnchhikwyj.supabase.co:5432", "aws-0-ap-southeast-1.pooler.supabase.com:6543")
+      .replace("db.axaprqkzogwnchhikwyj.supabase.co", "aws-0-ap-southeast-1.pooler.supabase.com");
+    if (rawUrl.includes("postgresql://postgres:") && !rawUrl.includes("postgres.axaprqkzogwnchhikwyj:")) {
+      rawUrl = rawUrl.replace("postgresql://postgres:", "postgresql://postgres.axaprqkzogwnchhikwyj:");
+    }
+    if (rawUrl.includes("postgres://postgres:") && !rawUrl.includes("postgres.axaprqkzogwnchhikwyj:")) {
+      rawUrl = rawUrl.replace("postgres://postgres:", "postgres://postgres.axaprqkzogwnchhikwyj:");
+    }
+  } else if (rawUrl.match(/db\.[a-z0-9]+\.supabase\.co/i)) {
+    const refMatch = rawUrl.match(/db\.([a-z0-9]+)\.supabase\.co/i);
+    if (refMatch && refMatch[1]) {
+      const ref = refMatch[1];
+      rawUrl = rawUrl
+        .replace(`db.${ref}.supabase.co:5432`, `aws-0-ap-southeast-1.pooler.supabase.com:6543`)
+        .replace(`db.${ref}.supabase.co`, `aws-0-ap-southeast-1.pooler.supabase.com`);
+      if (rawUrl.includes("postgresql://postgres:") && !rawUrl.includes(`postgres.${ref}:`)) {
+        rawUrl = rawUrl.replace("postgresql://postgres:", `postgresql://postgres.${ref}:`);
+      }
+      if (rawUrl.includes("postgres://postgres:") && !rawUrl.includes(`postgres.${ref}:`)) {
+        rawUrl = rawUrl.replace("postgres://postgres:", `postgres://postgres.${ref}:`);
+      }
+    }
+  }
+
+  return rawUrl;
+}
+
+const connectionString = getSanitizedConnectionString();
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   process.env.SUPABASE_URL ||
@@ -14,7 +59,14 @@ const supabaseKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   "";
 
-const client = postgres(connectionString, { prepare: false, ssl: "require" });
+const client = postgres(connectionString, {
+  prepare: false,
+  ssl: "require",
+  max: 10,
+  idle_timeout: 20,
+  connect_timeout: 10,
+});
+
 export const drizzleDb = drizzle(client, { schema });
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   global: {
