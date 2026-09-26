@@ -93,6 +93,8 @@ export const createEventConfigSchema = z.object({
 export const updateEventConfigSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   description: z.string().optional(),
+  venue: z.string().optional(),
+  points: z.number().int().min(0).optional(),
   submissionStartAt: z.coerce.date().nullable().optional(),
   submissionEndAt: z.coerce.date().nullable().optional(),
   minImages: z.number().int().min(1).max(5).optional(),

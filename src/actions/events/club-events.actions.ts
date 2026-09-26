@@ -669,9 +669,20 @@ export async function updateCompetitionEventAction(
 
     const validated: UpdateEventConfigInput =
       await ClubEventsValidator.validateUpdateEventConfig(rawInput);
-    const updated = await eventsRepo.update(eventId as UUID, validated as any, actor.id);
+    const updatePayload: any = { ...validated };
+    
+    // Keep base points and submissionPoints in lockstep
+    if (updatePayload.points !== undefined && updatePayload.submissionPoints === undefined) {
+      updatePayload.submissionPoints = updatePayload.points;
+    } else if (updatePayload.submissionPoints !== undefined && updatePayload.points === undefined) {
+      updatePayload.points = updatePayload.submissionPoints;
+    }
+
+    const updated = await eventsRepo.update(eventId as UUID, updatePayload, actor.id);
 
     safeRevalidatePath(`/dashboard/events`);
+    safeRevalidatePath(`/dashboard/events/${eventId}`);
+    safeRevalidatePath(`/events`);
     safeRevalidatePath(`/events/${eventId}`);
     return { success: true, data: updated };
   } catch (error) {

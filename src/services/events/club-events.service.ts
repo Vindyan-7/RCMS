@@ -439,7 +439,7 @@ export class ClubEventsService {
       try {
         const member = await this.membersRepo.findById(participant.memberId);
         if (member && member.status === "active") {
-          const subPoints = event.submissionPoints ?? 100;
+          const subPoints = event.submissionPoints ?? event.points ?? 100;
           if (subPoints > 0) {
             const existingEntries = await this.pointsLedgerRepo.findByMemberAndReference(
               participant.memberId,
@@ -672,7 +672,7 @@ export class ClubEventsService {
         const member = await this.membersRepo.findById(voter.memberId);
         if (member && member.status === "active") {
           const votingPoints = this.calculateVotingPoints(
-            event.submissionPoints ?? 100,
+            event.submissionPoints ?? event.points ?? 100,
             event.votingPercentage ?? 40
           );
           if (votingPoints > 0) {
@@ -1070,7 +1070,7 @@ export class ClubEventsService {
     const event = await this.eventsRepo.findById(eventId);
     if (!event || !event.isCompetition) return { submissionPointsAwarded: 0, votingPointsAwarded: 0 };
 
-    const subPoints = event.submissionPoints ?? 100;
+    const subPoints = event.submissionPoints ?? event.points ?? 100;
     const votingPoints = this.calculateVotingPoints(subPoints, event.votingPercentage ?? 40);
 
     let subCount = 0;
@@ -1142,7 +1142,7 @@ export class ClubEventsService {
     totalEventPointsAwarded: number;
   }> {
     const event = await this.eventsRepo.findById(eventId);
-    const subPointsConfig = event?.submissionPoints ?? 100;
+    const subPointsConfig = event?.submissionPoints ?? event?.points ?? 100;
     const votingPercentage = event?.votingPercentage ?? 40;
     const votingPointsConfig = this.calculateVotingPoints(subPointsConfig, votingPercentage);
 

@@ -329,16 +329,23 @@ export function PublicEventDetailClient({
                 <VotingStateBadge state={event.votingState} />
               </div>
 
-              <div className="inline-flex flex-wrap items-center gap-1.5 sm:gap-2 rounded-full bg-white/15 backdrop-blur-md px-3 sm:px-3.5 py-1 text-[11px] sm:text-xs font-bold text-amber-300 border border-white/20 shadow-md">
-                <span className="inline-flex items-center space-x-1.5">
-                  <Award className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400 shrink-0" />
-                  <span>{event.submissionPoints ?? 100} Pts (Sub)</span>
-                </span>
-                <span className="text-white/40">•</span>
-                <span>{Math.round(((event.submissionPoints ?? 100) * (event.votingPercentage ?? 40)) / 100)} Pts (Vote)</span>
-                <span className="text-white/40 hidden sm:inline">•</span>
-                <span className="text-[10px] sm:text-[11px] font-normal text-amber-200/90 hidden sm:inline">Official Members</span>
-              </div>
+              {(() => {
+                const subPoints = event.submissionPoints ?? event.points ?? 100;
+                const votePercentage = event.votingPercentage ?? 40;
+                const votePoints = Math.round((subPoints * votePercentage) / 100);
+                return (
+                  <div className="inline-flex flex-wrap items-center gap-1.5 sm:gap-2 rounded-full bg-white/15 backdrop-blur-md px-3 sm:px-3.5 py-1 text-[11px] sm:text-xs font-bold text-amber-300 border border-white/20 shadow-md">
+                    <span className="inline-flex items-center space-x-1.5">
+                      <Award className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400 shrink-0" />
+                      <span>{subPoints} Pts (Sub)</span>
+                    </span>
+                    <span className="text-white/40">•</span>
+                    <span>{votePoints} Pts (Vote)</span>
+                    <span className="text-white/40 hidden sm:inline">•</span>
+                    <span className="text-[10px] sm:text-[11px] font-normal text-amber-200/90 hidden sm:inline">Official Members</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -361,21 +368,28 @@ export function PublicEventDetailClient({
                 </p>
 
                 {/* Event Points Information Chip */}
-                <div className="inline-flex flex-wrap items-center gap-2 py-1.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-medium text-amber-900">
-                  <div className="flex items-center space-x-1 font-bold text-amber-950">
-                    <Award className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                    <span>Event Points:</span>
-                  </div>
-                  <span>
-                    Sub: <strong>{event.submissionPoints ?? 100}</strong> pts
-                  </span>
-                  <span>•</span>
-                  <span>
-                    Vote: <strong>{Math.round(((event.submissionPoints ?? 100) * (event.votingPercentage ?? 40)) / 100)}</strong> pts
-                  </span>
-                  <span>•</span>
-                  <span className="text-amber-700/80 italic text-[11px]">Official Club members only</span>
-                </div>
+                {(() => {
+                  const subPoints = event.submissionPoints ?? event.points ?? 100;
+                  const votePercentage = event.votingPercentage ?? 40;
+                  const votePoints = Math.round((subPoints * votePercentage) / 100);
+                  return (
+                    <div className="inline-flex flex-wrap items-center gap-2 py-1.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-medium text-amber-900">
+                      <div className="flex items-center space-x-1 font-bold text-amber-950">
+                        <Award className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                        <span>Event Points:</span>
+                      </div>
+                      <span>
+                        Sub: <strong>{subPoints}</strong> pts
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Vote: <strong>{votePoints}</strong> pts
+                      </span>
+                      <span>•</span>
+                      <span className="text-amber-700/80 italic text-[11px]">Official Club members only</span>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Primary Call to Action */}

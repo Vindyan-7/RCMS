@@ -126,7 +126,8 @@ export function EventWorkspaceClient({
   const [cfgName, setCfgName] = useState(event.name);
   const [cfgDescription, setCfgDescription] = useState(event.description || "");
   const [cfgVenue, setCfgVenue] = useState(event.venue || "");
-  const [cfgPoints, setCfgPoints] = useState(event.points ?? 35);
+  const [cfgPoints, setCfgPoints] = useState(event.submissionPoints ?? event.points ?? 35);
+  const [cfgVotingPercentage, setCfgVotingPercentage] = useState(event.votingPercentage ?? 40);
   const [cfgCoverUrl, setCfgCoverUrl] = useState(event.coverImageUrl || "");
   const [cfgCoverUploading, setCfgCoverUploading] = useState(false);
   const [cfgSubStart, setCfgSubStart] = useState(
@@ -159,6 +160,8 @@ export function EventWorkspaceClient({
           setStats(res.data.stats);
           setSubmissions(res.data.submissions);
           setRankings(res.data.rankings);
+          setCfgPoints(res.data.event.submissionPoints ?? res.data.event.points ?? 35);
+          setCfgVotingPercentage(res.data.event.votingPercentage ?? 40);
           // If drawer open, update selected submission
           if (selectedSubmission) {
             const updated = res.data.submissions.find((s) => s.id === selectedSubmission.id) || null;
@@ -331,11 +334,14 @@ export function EventWorkspaceClient({
 
     startActionTransition(async () => {
       try {
+        const pointsNum = Number(cfgPoints);
         const res = await updateCompetitionEventAction(event.id, {
           name: cfgName.trim(),
           description: cfgDescription.trim() || undefined,
           venue: cfgVenue.trim() || undefined,
-          points: Number(cfgPoints),
+          points: pointsNum,
+          submissionPoints: pointsNum,
+          votingPercentage: Number(cfgVotingPercentage),
           coverImageUrl: cfgCoverUrl.trim() || null,
           submissionStartAt: cfgSubStart ? new Date(cfgSubStart) : null,
           submissionEndAt: cfgSubEnd ? new Date(cfgSubEnd) : null,
@@ -764,11 +770,11 @@ export function EventWorkspaceClient({
 
               <div className="flex items-center space-x-3 text-xs font-mono">
                 <span className="text-muted-foreground">
-                  Submission: <strong className="text-foreground">{event.submissionPoints ?? 100} pts</strong>
+                  Submission: <strong className="text-foreground">{event.submissionPoints ?? event.points ?? 100} pts</strong>
                 </span>
                 <span className="text-muted-foreground">•</span>
                 <span className="text-muted-foreground">
-                  Voting: <strong className="text-foreground">{Math.round(((event.submissionPoints ?? 100) * (event.votingPercentage ?? 40)) / 100)} pts</strong> ({event.votingPercentage ?? 40}%)
+                  Voting: <strong className="text-foreground">{Math.round(((event.submissionPoints ?? event.points ?? 100) * (event.votingPercentage ?? 40)) / 100)} pts</strong> ({event.votingPercentage ?? 40}%)
                 </span>
               </div>
             </div>
@@ -780,7 +786,7 @@ export function EventWorkspaceClient({
                 </span>
                 <div className="flex items-baseline space-x-2">
                   <span className="text-lg font-bold text-foreground">
-                    {event.submissionPoints ?? 100}
+                    {event.submissionPoints ?? event.points ?? 100}
                   </span>
                   <span className="text-[10px] text-muted-foreground">
                     pts on valid submission
@@ -794,7 +800,7 @@ export function EventWorkspaceClient({
                 </span>
                 <div className="flex items-baseline space-x-2">
                   <span className="text-lg font-bold text-foreground">
-                    {Math.round(((event.submissionPoints ?? 100) * (event.votingPercentage ?? 40)) / 100)}
+                    {Math.round(((event.submissionPoints ?? event.points ?? 100) * (event.votingPercentage ?? 40)) / 100)}
                   </span>
                   <span className="text-[10px] text-muted-foreground">
                     pts on casting vote ({event.votingPercentage ?? 40}%)
@@ -808,7 +814,7 @@ export function EventWorkspaceClient({
                 </span>
                 <div className="flex items-baseline space-x-2">
                   <span className="text-lg font-bold text-emerald-400">
-                    {(event.submissionPoints ?? 100) + Math.round(((event.submissionPoints ?? 100) * (event.votingPercentage ?? 40)) / 100)}
+                    {(event.submissionPoints ?? event.points ?? 100) + Math.round(((event.submissionPoints ?? event.points ?? 100) * (event.votingPercentage ?? 40)) / 100)}
                   </span>
                   <span className="text-[10px] text-emerald-500/70">
                     total event contribution
@@ -1420,7 +1426,7 @@ export function EventWorkspaceClient({
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div className="space-y-1.5">
                 <label className="font-semibold text-foreground">Venue</label>
                 <input
@@ -1432,7 +1438,7 @@ export function EventWorkspaceClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-semibold text-foreground">Points Reward</label>
+                <label className="font-semibold text-foreground">Submission Points</label>
                 <input
                   type="number"
                   min={0}
@@ -1440,6 +1446,21 @@ export function EventWorkspaceClient({
                   onChange={(e) => setCfgPoints(Number(e.target.value))}
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground">Voting Percentage (%)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={cfgVotingPercentage}
+                  onChange={(e) => setCfgVotingPercentage(Number(e.target.value))}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Voting reward: {Math.round((cfgPoints * cfgVotingPercentage) / 100)} pts ({cfgVotingPercentage}%)
+                </p>
               </div>
             </div>
 
