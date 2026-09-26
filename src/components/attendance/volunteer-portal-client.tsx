@@ -272,7 +272,7 @@ export function VolunteerPortalClient() {
         </div>
 
         {authSession ? (
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-xs text-destructive hover:bg-destructive/10 h-8">
+          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-xs text-destructive hover:bg-destructive/10 min-h-[40px] px-3">
             <LogOut className="h-4 w-4 mr-1" /> Logout
           </Button>
         ) : (
@@ -338,7 +338,7 @@ export function VolunteerPortalClient() {
                   value={memberInput}
                   placeholder="e.g. SAC-RC-26001 or 26RC1001"
                   onChange={(e) => setMemberInput(e.target.value)}
-                  className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary/20"
+                  className="w-full min-h-[44px] rounded-xl border border-input bg-background px-3.5 py-2.5 text-base sm:text-sm focus:ring-2 focus:ring-primary/20"
                 />
               </div>
 
@@ -352,11 +352,11 @@ export function VolunteerPortalClient() {
                   value={pinCode}
                   placeholder="Enter 6-digit PIN..."
                   onChange={(e) => setPinCode(e.target.value)}
-                  className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm font-mono tracking-widest text-center font-bold text-lg focus:ring-2 focus:ring-primary/20"
+                  className="w-full min-h-[48px] rounded-xl border border-input bg-background px-3.5 py-2.5 text-base sm:text-lg font-mono tracking-widest text-center font-bold focus:ring-2 focus:ring-primary/20"
                 />
               </div>
 
-              <Button type="submit" className="w-full h-11 font-bold text-sm" disabled={isPending}>
+              <Button type="submit" className="w-full min-h-[48px] font-bold text-sm touch-manipulation" disabled={isPending}>
                 {isPending ? "Authenticating..." : "Authenticate & Open Scanner"}
               </Button>
             </form>
@@ -433,7 +433,7 @@ export function VolunteerPortalClient() {
               <button
                 type="button"
                 onClick={() => setActiveTab("search")}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center space-x-1.5 ${
+                className={`flex-1 min-h-[44px] py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center space-x-1.5 touch-manipulation ${
                   activeTab === "search"
                     ? "bg-card text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -445,7 +445,7 @@ export function VolunteerPortalClient() {
               <button
                 type="button"
                 onClick={() => setActiveTab("qr")}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center space-x-1.5 ${
+                className={`flex-1 min-h-[44px] py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center space-x-1.5 touch-manipulation ${
                   activeTab === "qr"
                     ? "bg-card text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -461,14 +461,14 @@ export function VolunteerPortalClient() {
               <div className="space-y-3">
                 {/* Universal Search Bar */}
                 <div className="relative">
-                  <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   <input
                     ref={searchInputRef}
                     type="text"
                     value={searchQuery}
                     placeholder="Search Club Membership ID, Roll No, Name, Phone..."
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full rounded-2xl border border-input bg-card pl-10 pr-10 py-2.5 text-sm font-medium shadow-sm focus:ring-2 focus:ring-primary/20"
+                    className="w-full min-h-[44px] rounded-2xl border border-input bg-card pl-10 pr-11 py-2.5 text-base sm:text-sm font-medium shadow-sm focus:ring-2 focus:ring-primary/20"
                   />
                   {searchQuery ? (
                     <button
@@ -476,12 +476,13 @@ export function VolunteerPortalClient() {
                         setSearchQuery("");
                         searchInputRef.current?.focus();
                       }}
-                      className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center text-muted-foreground hover:text-foreground touch-manipulation"
+                      aria-label="Clear search"
                     >
                       <X className="h-4 w-4" />
                     </button>
                   ) : isSearchingMembers ? (
-                    <RefreshCw className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
+                    <RefreshCw className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground pointer-events-none" />
                   ) : null}
                 </div>
 
@@ -525,7 +526,7 @@ export function VolunteerPortalClient() {
                           {/* REQUIREMENT 5: Large Present Button / Badge */}
                           <div className="shrink-0">
                             {isMarked ? (
-                              <div className="flex items-center space-x-1 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-2 rounded-xl border border-emerald-500/20 font-bold text-xs">
+                              <div className="min-h-[44px] flex items-center space-x-1 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3.5 py-2 rounded-xl border border-emerald-500/20 font-bold text-xs">
                                 <Check className="h-4 w-4" />
                                 <span>Present</span>
                               </div>
@@ -534,7 +535,7 @@ export function VolunteerPortalClient() {
                                 size="sm"
                                 onClick={() => handleMarkPresent(member)}
                                 disabled={isPending}
-                                className="h-10 px-4 font-bold text-xs flex items-center space-x-1.5 shadow-sm active:scale-95 transition-transform"
+                                className="min-h-[44px] px-4 font-bold text-xs flex items-center space-x-1.5 shadow-sm active:scale-95 transition-transform touch-manipulation"
                               >
                                 <CheckCircle className="h-4 w-4" />
                                 <span>Mark Present</span>
@@ -573,7 +574,7 @@ export function VolunteerPortalClient() {
                     setActiveTab("search");
                     setTimeout(() => searchInputRef.current?.focus(), 50);
                   }}
-                  className="w-full text-xs font-bold flex items-center justify-center space-x-2 h-10"
+                  className="w-full min-h-[44px] text-xs font-bold flex items-center justify-center space-x-2 touch-manipulation"
                 >
                   <span>Switch to Manual Search Check-in</span>
                   <ArrowRight className="h-4 w-4" />

@@ -48,24 +48,24 @@ export function PublicLeaderboardClient({ initialLeaderboard }: PublicLeaderboar
   return (
     <div className="space-y-6">
       {/* Filters Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search member name or ID (e.g. SAC-RC-26002)..."
+            placeholder="Search name or ID (e.g. SAC-RC-26002)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[44px]"
           />
         </div>
 
         <div className="flex items-center space-x-2">
-          <Filter className="h-4 w-4 text-slate-400 flex-shrink-0" />
+          <Filter className="h-4 w-4 text-slate-400 shrink-0" />
           <select
             value={branchFilter}
             onChange={(e) => setBranchFilter(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none"
+            className="w-full sm:w-auto rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none min-h-[44px]"
           >
             <option value="all">All Branches</option>
             {RCMS_BRANCHES.map((b) => (
@@ -144,34 +144,36 @@ export function PublicLeaderboardClient({ initialLeaderboard }: PublicLeaderboar
             </div>
           ) : (
             filteredItems.map((item) => (
-              <div key={item.membershipId} className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2.5">
-                    <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs ${getRankBadgeClass(item.rank)}`}>
+              <div key={item.membershipId} className="p-3.5 sm:p-4 space-y-2.5 sm:space-y-3">
+                <div className="flex items-center justify-between gap-2.5 min-w-0">
+                  <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                    <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs ${getRankBadgeClass(item.rank)}`}>
                       {item.rank === 1 ? "🥇" : item.rank === 2 ? "🥈" : item.rank === 3 ? "🥉" : `#${item.rank}`}
                     </span>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900">{item.memberName}</h4>
-                      <p className="text-[11px] font-mono text-slate-500">{item.membershipId}</p>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm font-bold text-slate-900 truncate">{item.memberName}</h4>
+                      <p className="text-[11px] font-mono text-slate-500 truncate">{item.membershipId}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-base font-bold text-blue-600">{item.totalPoints} Pts</span>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs sm:text-sm font-bold text-blue-600 rounded-full bg-blue-50 px-2.5 py-1 border border-blue-200/60 inline-block">
+                      {item.totalPoints} Pts
+                    </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-lg text-[11px] border border-slate-100">
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">Branch</span>
-                    <span className="font-semibold text-slate-700">{item.branch}</span>
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2 bg-slate-50 p-2 sm:p-2.5 rounded-lg text-[11px] border border-slate-100">
+                  <div className="truncate">
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Branch</span>
+                    <span className="font-semibold text-slate-700 truncate block">{item.branch}</span>
                   </div>
-                  <div className="text-center">
-                    <span className="text-slate-400 block text-[10px]">Tasks</span>
-                    <span className="font-semibold text-slate-700">{item.tasksCompleted}</span>
+                  <div className="text-center truncate">
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Tasks</span>
+                    <span className="font-semibold text-slate-700 block">{item.tasksCompleted}</span>
                   </div>
-                  <div className="text-right">
-                    <span className="text-slate-400 block text-[10px]">Attendance</span>
-                    <span className="font-semibold text-slate-700">{item.attendanceRate}%</span>
+                  <div className="text-right truncate">
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Attendance</span>
+                    <span className="font-semibold text-slate-700 block">{item.attendanceRate}%</span>
                   </div>
                 </div>
               </div>

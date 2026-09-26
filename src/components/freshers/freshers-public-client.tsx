@@ -140,21 +140,21 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
             <div className="pt-2 flex flex-col gap-3">
               <Link
                 href="/about"
-                className="w-full inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-900 px-5 py-3.5 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-md"
+                className="w-full min-h-[48px] inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-900 px-5 py-3 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-md touch-manipulation"
               >
                 <Bot className="h-4 w-4" />
                 <span>Explore Robotics Club</span>
               </Link>
               <Link
                 href="/leaderboard"
-                className="w-full inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-100 border border-slate-200 px-5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 hover:text-slate-900 transition-colors"
+                className="w-full min-h-[48px] inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-100 border border-slate-200 px-5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 hover:text-slate-900 transition-colors touch-manipulation"
               >
                 <Trophy className="h-4 w-4 text-amber-500" />
                 <span>View Leaderboard</span>
               </Link>
               <Link
                 href="/"
-                className="w-full inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-50 border border-slate-200 px-5 py-3 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                className="w-full min-h-[48px] inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-50 border border-slate-200 px-5 py-3 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors touch-manipulation"
               >
                 <Home className="h-4 w-4 text-slate-500" />
                 <span>Return Home</span>
@@ -205,7 +205,7 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
             <div className="pt-2 flex flex-col gap-3">
               <Link
                 href="/about"
-                className="w-full inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-900 px-5 py-3.5 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-md"
+                className="w-full min-h-[48px] inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-900 px-5 py-3 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-md touch-manipulation"
               >
                 <Bot className="h-4 w-4" />
                 <span>Explore Robotics Club</span>
@@ -213,14 +213,14 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
               </Link>
               <Link
                 href="/leaderboard"
-                className="w-full inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-100 border border-slate-200 px-5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 hover:text-slate-900 transition-colors"
+                className="w-full min-h-[48px] inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-100 border border-slate-200 px-5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 hover:text-slate-900 transition-colors touch-manipulation"
               >
                 <Trophy className="h-4 w-4 text-amber-500" />
                 <span>View Leaderboard</span>
               </Link>
               <Link
                 href="/"
-                className="w-full inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-50 border border-slate-200 px-5 py-3 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                className="w-full min-h-[48px] inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-50 border border-slate-200 px-5 py-3 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors touch-manipulation"
               >
                 <Home className="h-4 w-4 text-slate-500" />
                 <span>Return Home</span>
@@ -281,7 +281,7 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
             <div className="pt-2 flex flex-col gap-3">
               <Link
                 href="/about"
-                className="w-full inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-900 px-5 py-3.5 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-md"
+                className="w-full min-h-[48px] inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-900 px-5 py-3 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-md touch-manipulation"
               >
                 <Bot className="h-4 w-4" />
                 <span>Explore Robotics Club</span>
@@ -289,14 +289,14 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
               </Link>
               <Link
                 href="/leaderboard"
-                className="w-full inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-100 border border-slate-200 px-5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 hover:text-slate-900 transition-colors"
+                className="w-full min-h-[48px] inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-100 border border-slate-200 px-5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 hover:text-slate-900 transition-colors touch-manipulation"
               >
                 <Trophy className="h-4 w-4 text-amber-500" />
                 <span>View Leaderboard</span>
               </Link>
               <Link
                 href="/"
-                className="w-full inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-50 border border-slate-200 px-5 py-3 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                className="w-full min-h-[48px] inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-50 border border-slate-200 px-5 py-3 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors touch-manipulation"
               >
                 <Home className="h-4 w-4 text-slate-500" />
                 <span>Return Home</span>
@@ -363,7 +363,7 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
               <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 pt-2">
                 <a
                   href="#register-form"
-                  className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:from-blue-500 hover:to-indigo-500 transition-all hover:scale-[1.02] active:scale-[0.99]"
+                  className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center space-x-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:from-blue-500 hover:to-indigo-500 transition-all hover:scale-[1.02] active:scale-[0.99] touch-manipulation"
                 >
                   <Sparkles className="h-4 w-4 text-amber-300" />
                   <span>Enter the Lucky Draw</span>
@@ -372,7 +372,7 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
 
                 <Link
                   href="/about"
-                  className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 rounded-xl bg-white border border-slate-200 px-6 py-3.5 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors shadow-2xs"
+                  className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center space-x-2 rounded-xl bg-white border border-slate-200 px-6 py-3.5 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors shadow-2xs touch-manipulation"
                 >
                   <Bot className="h-4 w-4 text-blue-600" />
                   <span>Explore Robotics Club</span>
@@ -439,7 +439,7 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
                       placeholder="e.g. Rahul Sharma"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="w-full rounded-xl bg-white border border-slate-300 px-4 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all shadow-2xs"
+                      className="w-full min-h-[48px] rounded-xl bg-white border border-slate-300 px-4 py-3 text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all shadow-2xs"
                     />
                   </div>
 
@@ -449,7 +449,7 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
                       Mobile Number <span className="text-blue-600">*</span>
                     </label>
                     <div className="relative">
-                      <span className="absolute left-4 top-3.5 text-sm font-semibold text-slate-500">+91</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500 pointer-events-none">+91</span>
                       <input
                         type="tel"
                         required
@@ -457,7 +457,7 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
                         placeholder="9876543210"
                         value={mobileNumber}
                         onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ""))}
-                        className="w-full rounded-xl bg-white border border-slate-300 pl-14 pr-4 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all shadow-2xs"
+                        className="w-full min-h-[48px] rounded-xl bg-white border border-slate-300 pl-14 pr-4 py-3 text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all shadow-2xs"
                       />
                     </div>
                   </div>
@@ -467,7 +467,7 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
                     <label className="text-xs font-semibold text-slate-700">
                       How was the Robotics Club stall? <span className="text-blue-600">*</span>
                     </label>
-                    <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-3.5">
+                    <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-2 sm:p-3.5">
                       {[1, 2, 3, 4, 5].map((star) => {
                         const active = star <= (hoverRating || stallRating);
                         return (
@@ -477,7 +477,8 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
                             onClick={() => setStallRating(star)}
                             onMouseEnter={() => setHoverRating(star)}
                             onMouseLeave={() => setHoverRating(0)}
-                            className="p-1 focus:outline-none transition-transform hover:scale-125"
+                            className="flex h-11 w-11 items-center justify-center rounded-xl focus:outline-none transition-transform hover:scale-110 active:scale-95 touch-manipulation"
+                            aria-label={`Rate ${star} stars`}
                           >
                             <Star
                               className={`h-7 w-7 transition-colors ${
@@ -500,7 +501,7 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
                       placeholder="e.g. Loved the rover demo & team energy!"
                       value={feedback}
                       onChange={(e) => setFeedback(e.target.value)}
-                      className="w-full rounded-xl bg-white border border-slate-300 px-4 py-3 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all resize-none shadow-2xs"
+                      className="w-full rounded-xl bg-white border border-slate-300 px-4 py-3 text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all resize-none shadow-2xs"
                     />
                   </div>
 
@@ -508,7 +509,7 @@ export function FreshersPublicClient({ campaign }: FreshersPublicClientProps) {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full inline-flex items-center justify-center space-x-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 transition-all active:scale-[0.99] mt-2"
+                    className="w-full min-h-[50px] inline-flex items-center justify-center space-x-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 transition-all active:scale-[0.99] mt-2 touch-manipulation"
                   >
                     {submitting ? (
                       <>

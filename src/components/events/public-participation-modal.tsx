@@ -161,15 +161,20 @@ export function PublicParticipationModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={handleClose}
     >
       <div
-        className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-2xl"
+        className="relative w-full max-w-md max-h-[90dvh] sm:max-h-[85dvh] flex flex-col rounded-t-3xl sm:rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile Drag Indicator */}
+        <div className="pt-2.5 pb-1 sm:hidden flex justify-center">
+          <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+        </div>
+
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 sm:px-6 py-3.5 sm:py-4 shrink-0">
           <div className="space-y-0.5">
             <h2 className="text-base font-bold text-slate-900">
               Event Participation
@@ -180,23 +185,23 @@ export function PublicParticipationModal({
           </div>
           <button
             onClick={handleClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Error Alert */}
-        {errorMessage ? (
-          <div className="mx-6 mt-4 flex items-start space-x-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
-            <AlertCircle className="h-4 w-4 text-rose-600 flex-shrink-0 mt-0.5" />
-            <span className="leading-relaxed">{errorMessage}</span>
-          </div>
-        ) : null}
+        {/* Scrollable Container */}
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+          {/* Error Alert */}
+          {errorMessage ? (
+            <div className="flex items-start space-x-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
+              <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+              <span className="leading-relaxed">{errorMessage}</span>
+            </div>
+          ) : null}
 
-        {/* Modal Content */}
-        <div className="p-6">
           {/* STEP 1: CHOICE SCREEN */}
           {tab === "choice" && (
             <div className="space-y-4">
@@ -210,13 +215,13 @@ export function PublicParticipationModal({
                     setErrorMessage("");
                     setTab("member_lookup");
                   }}
-                  className="group flex items-start space-x-3 rounded-xl border border-slate-200 p-4 text-left hover:border-blue-600 hover:bg-blue-50/40 transition-all shadow-xs"
+                  className="group flex items-start space-x-3.5 rounded-2xl border border-slate-200 p-4 text-left hover:border-blue-600 hover:bg-blue-50/40 transition-all shadow-xs min-h-[64px]"
                 >
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                     <UserCheck className="h-5 w-5" />
                   </div>
                   <div className="space-y-1">
-                    <div className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                    <div className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
                       Official Club Member
                     </div>
                     <div className="text-[11px] text-slate-500 leading-relaxed">
@@ -230,13 +235,13 @@ export function PublicParticipationModal({
                     setErrorMessage("");
                     setTab("fresher");
                   }}
-                  className="group flex items-start space-x-3 rounded-xl border border-slate-200 p-4 text-left hover:border-indigo-600 hover:bg-indigo-50/40 transition-all shadow-xs"
+                  className="group flex items-start space-x-3.5 rounded-2xl border border-slate-200 p-4 text-left hover:border-indigo-600 hover:bg-indigo-50/40 transition-all shadow-xs min-h-[64px]"
                 >
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                     <Sparkles className="h-5 w-5" />
                   </div>
                   <div className="space-y-1">
-                    <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                    <div className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
                       Fresher / Non-Member
                     </div>
                     <div className="text-[11px] text-slate-500 leading-relaxed">
@@ -266,33 +271,33 @@ export function PublicParticipationModal({
                     placeholder="e.g. SAC-2026-0042 or 21EC084"
                     value={membershipQuery}
                     onChange={(e) => setMembershipQuery(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-900 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-hidden uppercase tracking-wider"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-hidden uppercase tracking-wider min-h-[44px]"
                   />
-                  <Search className="absolute right-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <Search className="absolute right-3.5 top-3.5 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
                 <p className="text-[11px] text-slate-400">
                   Enter your official membership ID or roll number to resolve your verified club record.
                 </p>
               </div>
 
-              <div className="flex items-center space-x-2 pt-2">
+              <div className="flex items-center space-x-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setErrorMessage("");
                     setTab("choice");
                   }}
-                  className="w-1/2 rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                  className="w-1/2 rounded-xl border border-slate-200 py-3 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors min-h-[44px]"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="w-1/2 inline-flex items-center justify-center space-x-1.5 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
+                  className="w-1/2 inline-flex items-center justify-center space-x-1.5 rounded-xl bg-slate-900 py-3 text-xs sm:text-sm font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 min-h-[44px]"
                 >
                   <span>{isPending ? "Searching..." : "Lookup Profile"}</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
             </form>
@@ -303,7 +308,7 @@ export function PublicParticipationModal({
             <div className="space-y-4">
               <div className="rounded-xl bg-blue-50/60 border border-blue-200/80 p-4 space-y-3">
                 <div className="flex items-center space-x-2 text-xs font-bold text-blue-900">
-                  <ShieldCheck className="h-4 w-4 text-blue-600" />
+                  <ShieldCheck className="h-4 w-4 text-blue-600 shrink-0" />
                   <span>Verified Club Member Record</span>
                 </div>
 
@@ -312,7 +317,7 @@ export function PublicParticipationModal({
                     <span className="text-[10px] uppercase font-semibold text-slate-400 block">
                       Name
                     </span>
-                    <span className="font-bold text-slate-900">
+                    <span className="font-bold text-slate-900 truncate block">
                       {resolvedMember.name}
                     </span>
                   </div>
@@ -320,7 +325,7 @@ export function PublicParticipationModal({
                     <span className="text-[10px] uppercase font-semibold text-slate-400 block">
                       Department
                     </span>
-                    <span className="font-medium text-slate-700">
+                    <span className="font-medium text-slate-700 truncate block">
                       {resolvedMember.branch || "Engineering"}
                     </span>
                   </div>
@@ -328,7 +333,7 @@ export function PublicParticipationModal({
                     <span className="text-[10px] uppercase font-semibold text-slate-400 block">
                       Roll Number
                     </span>
-                    <span className="font-medium text-slate-700">
+                    <span className="font-medium text-slate-700 truncate block">
                       {resolvedMember.rollNumber}
                     </span>
                   </div>
@@ -336,7 +341,7 @@ export function PublicParticipationModal({
                     <span className="text-[10px] uppercase font-semibold text-slate-400 block">
                       Membership ID
                     </span>
-                    <span className="font-medium text-slate-700">
+                    <span className="font-medium text-slate-700 truncate block">
                       {resolvedMember.clubMembershipId || "Official Member"}
                     </span>
                   </div>
@@ -347,31 +352,31 @@ export function PublicParticipationModal({
                 Confirming participation binds your official membership identity to this event. You will submit projects and vote under your verified member profile.
               </p>
 
-              <div className="flex items-center space-x-2 pt-2">
+              <div className="flex items-center space-x-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setErrorMessage("");
                     setTab("member_lookup");
                   }}
-                  className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                  className="w-1/3 rounded-xl border border-slate-200 py-3 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors min-h-[44px]"
                 >
-                  Change
+                  Back
                 </button>
                 <button
                   type="button"
                   onClick={handleMemberRegister}
                   disabled={isPending}
-                  className="w-2/3 inline-flex items-center justify-center space-x-1.5 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
+                  className="w-2/3 inline-flex items-center justify-center space-x-1.5 rounded-xl bg-blue-600 py-3 text-xs sm:text-sm font-bold text-white hover:bg-blue-700 transition-colors disabled:opacity-50 min-h-[44px]"
                 >
-                  <Check className="h-3.5 w-3.5" />
+                  <Check className="h-4 w-4" />
                   <span>{isPending ? "Confirming..." : "Confirm & Participate"}</span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* STEP 3: FRESHER REGISTRATION */}
+          {/* STEP 2C: FRESHER REGISTRATION */}
           {tab === "fresher" && (
             <form onSubmit={handleFresherRegister} className="space-y-4">
               <div className="space-y-1.5">
@@ -388,7 +393,7 @@ export function PublicParticipationModal({
                   placeholder="e.g. Alex Sharma"
                   value={fresherName}
                   onChange={(e) => setFresherName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-900 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-hidden"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-hidden min-h-[44px]"
                 />
               </div>
 
@@ -408,32 +413,32 @@ export function PublicParticipationModal({
                     placeholder="9876543210"
                     value={fresherMobile}
                     onChange={(e) => setFresherMobile(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-900 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-hidden"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-hidden min-h-[44px]"
                   />
-                  <Phone className="absolute right-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <Phone className="absolute right-3.5 top-3.5 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
                 <p className="text-[11px] text-slate-400">
                   Your phone number is used strictly for identity verification and anti-abuse protection. It will never be publicly displayed.
                 </p>
               </div>
 
-              <div className="flex items-center space-x-2 pt-2">
+              <div className="flex items-center space-x-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setErrorMessage("");
                     setTab("choice");
                   }}
-                  className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                  className="w-1/3 rounded-xl border border-slate-200 py-3 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors min-h-[44px]"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="w-2/3 inline-flex items-center justify-center space-x-1.5 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white hover:bg-indigo-600 transition-colors disabled:opacity-50"
+                  className="w-2/3 inline-flex items-center justify-center space-x-1.5 rounded-xl bg-slate-900 py-3 text-xs sm:text-sm font-bold text-white hover:bg-indigo-600 transition-colors disabled:opacity-50 min-h-[44px]"
                 >
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <Sparkles className="h-4 w-4" />
                   <span>{isPending ? "Registering..." : "Register & Participate"}</span>
                 </button>
               </div>

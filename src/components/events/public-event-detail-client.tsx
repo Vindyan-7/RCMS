@@ -320,8 +320,8 @@ export function PublicEventDetailClient({
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
 
             {/* Bottom Floating Bar on Hero */}
-            <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6 mx-auto max-w-7xl flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
+            <div className="absolute bottom-3 left-3 right-3 sm:bottom-6 sm:left-6 sm:right-6 mx-auto max-w-7xl flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <SubmissionStatusBadge
                   startAt={event.submissionStartAt}
                   endAt={event.submissionEndAt}
@@ -329,61 +329,61 @@ export function PublicEventDetailClient({
                 <VotingStateBadge state={event.votingState} />
               </div>
 
-              <div className="inline-flex flex-wrap items-center gap-2 rounded-full bg-white/15 backdrop-blur-md px-3.5 py-1 text-xs font-bold text-amber-300 border border-white/20 shadow-md">
+              <div className="inline-flex flex-wrap items-center gap-1.5 sm:gap-2 rounded-full bg-white/15 backdrop-blur-md px-3 sm:px-3.5 py-1 text-[11px] sm:text-xs font-bold text-amber-300 border border-white/20 shadow-md">
                 <span className="inline-flex items-center space-x-1.5">
-                  <Award className="h-4 w-4 text-amber-400" />
-                  <span>{event.submissionPoints ?? 100} Pts (Submission)</span>
+                  <Award className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400 shrink-0" />
+                  <span>{event.submissionPoints ?? 100} Pts (Sub)</span>
                 </span>
                 <span className="text-white/40">•</span>
-                <span>{Math.round(((event.submissionPoints ?? 100) * (event.votingPercentage ?? 40)) / 100)} Pts (Voting)</span>
-                <span className="text-white/40">•</span>
-                <span className="text-[11px] font-normal text-amber-200/90">Official Members</span>
+                <span>{Math.round(((event.submissionPoints ?? 100) * (event.votingPercentage ?? 40)) / 100)} Pts (Vote)</span>
+                <span className="text-white/40 hidden sm:inline">•</span>
+                <span className="text-[10px] sm:text-[11px] font-normal text-amber-200/90 hidden sm:inline">Official Members</span>
               </div>
             </div>
           </div>
 
           {/* Title & Primary Action Area */}
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
-            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-              <div className="space-y-3 max-w-3xl">
+          <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 sm:gap-6">
+              <div className="space-y-2.5 sm:space-y-3 max-w-3xl">
                 <div className="inline-flex items-center space-x-2 text-xs font-semibold text-blue-600">
-                  <Trophy className="h-3.5 w-3.5" />
+                  <Trophy className="h-3.5 w-3.5 shrink-0" />
                   <span>Robotics Club Innovation Series</span>
                 </div>
 
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 leading-tight">
                   {event.name}
                 </h1>
 
-                <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
+                <p className="text-xs sm:text-sm md:text-base text-slate-600 leading-relaxed">
                   {event.description ||
                     "Participate in this official robotics engineering challenge. Build your prototype, document your engineering design, and showcase it for peer evaluation."}
                 </p>
 
                 {/* Event Points Information Chip */}
-                <div className="inline-flex flex-wrap items-center gap-2.5 py-1.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-medium text-amber-900">
+                <div className="inline-flex flex-wrap items-center gap-2 py-1.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-medium text-amber-900">
                   <div className="flex items-center space-x-1 font-bold text-amber-950">
-                    <Award className="h-3.5 w-3.5 text-amber-600" />
+                    <Award className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                     <span>Event Points:</span>
                   </div>
                   <span>
-                    Submission: <strong>{event.submissionPoints ?? 100}</strong> pts
+                    Sub: <strong>{event.submissionPoints ?? 100}</strong> pts
                   </span>
                   <span>•</span>
                   <span>
-                    Voting: <strong>{Math.round(((event.submissionPoints ?? 100) * (event.votingPercentage ?? 40)) / 100)}</strong> pts
+                    Vote: <strong>{Math.round(((event.submissionPoints ?? 100) * (event.votingPercentage ?? 40)) / 100)}</strong> pts
                   </span>
                   <span>•</span>
-                  <span className="text-amber-700/80 italic">Official Robotics Club members only</span>
+                  <span className="text-amber-700/80 italic text-[11px]">Official Club members only</span>
                 </div>
               </div>
 
               {/* Primary Call to Action */}
-              <div className="flex-shrink-0 flex flex-col sm:flex-row items-stretch md:items-end gap-2.5">
+              <div className="w-full md:w-auto flex flex-col sm:flex-row items-stretch md:items-end gap-2.5 pt-2 md:pt-0">
                 {mySubmission ? (
                   <a
                     href="#my-submission"
-                    className="inline-flex items-center justify-center space-x-2 rounded-xl bg-emerald-600 px-6 py-3.5 text-xs font-bold text-white shadow-md hover:bg-emerald-700 transition-colors"
+                    className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 rounded-xl bg-emerald-600 px-6 py-3.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-emerald-700 transition-colors min-h-[48px]"
                   >
                     <CheckCircle2 className="h-4 w-4" />
                     <span>View My Submission</span>
@@ -397,7 +397,7 @@ export function PublicEventDetailClient({
                         setIsParticipationOpen(true);
                       }
                     }}
-                    className="inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-900 px-6 py-3.5 text-xs font-bold text-white shadow-md hover:bg-blue-600 transition-all hover:scale-[1.02]"
+                    className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-900 px-6 py-3.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-blue-600 transition-all hover:scale-[1.02] min-h-[48px]"
                   >
                     <Upload className="h-4 w-4 text-blue-400" />
                     <span>
@@ -408,7 +408,7 @@ export function PublicEventDetailClient({
                 ) : (
                   <a
                     href="#gallery"
-                    className="inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-900 px-6 py-3.5 text-xs font-bold text-white shadow-md hover:bg-slate-800 transition-colors"
+                    className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 rounded-xl bg-slate-900 px-6 py-3.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-slate-800 transition-colors min-h-[48px]"
                   >
                     <Vote className="h-4 w-4 text-amber-400" />
                     <span>View Projects Gallery</span>
@@ -419,10 +419,10 @@ export function PublicEventDetailClient({
 
             {/* Active Identity Bar if Participant established */}
             {activeParticipant ? (
-              <div className="flex items-center justify-between rounded-xl bg-blue-50/70 border border-blue-200/80 px-4 py-2.5 text-xs text-blue-900">
-                <div className="flex items-center space-x-2">
-                  <ShieldCheck className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                  <span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl bg-blue-50/70 border border-blue-200/80 px-4 py-3 text-xs text-blue-900 gap-2">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <ShieldCheck className="h-4 w-4 text-blue-600 shrink-0" />
+                  <span className="truncate">
                     Participating as:{" "}
                     <strong className="font-bold text-slate-900">
                       {activeParticipant.displayName}
@@ -432,7 +432,7 @@ export function PublicEventDetailClient({
                 </div>
                 <button
                   onClick={() => setIsParticipationOpen(true)}
-                  className="text-[11px] font-semibold text-blue-700 hover:text-blue-900 underline underline-offset-2"
+                  className="text-left sm:text-right text-[11px] font-semibold text-blue-700 hover:text-blue-900 underline underline-offset-2 shrink-0 py-1 min-h-[36px] flex items-center"
                 >
                   Switch Identity
                 </button>
@@ -765,15 +765,15 @@ export function PublicEventDetailClient({
                         <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                           <button
                             onClick={() => setSelectedProject(sub)}
-                            className="inline-flex items-center space-x-1 text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors"
+                            className="inline-flex items-center space-x-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors py-2 px-1 min-h-[44px]"
                           >
-                            <Eye className="h-3.5 w-3.5" />
+                            <Eye className="h-4 w-4" />
                             <span>Inspect</span>
                           </button>
 
                           {/* Voting Button states */}
                           {!isVotingActive ? (
-                            <span className="text-[11px] font-semibold text-slate-400">
+                            <span className="text-[11px] font-semibold text-slate-400 py-2">
                               {event.votingState === "NOT_STARTED"
                                 ? "Voting Soon"
                                 : event.votingState === "PAUSED"
@@ -783,25 +783,25 @@ export function PublicEventDetailClient({
                           ) : !activeParticipant ? (
                             <button
                               onClick={() => setIsParticipationOpen(true)}
-                              className="inline-flex items-center space-x-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-colors"
+                              className="inline-flex items-center space-x-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-colors min-h-[44px]"
                             >
-                              <Vote className="h-3.5 w-3.5" />
+                              <Vote className="h-4 w-4" />
                               <span>Vote</span>
                             </button>
                           ) : isSelf && !event.selfVotingAllowed ? (
-                            <span className="text-[11px] font-medium text-slate-400">
+                            <span className="text-[11px] font-medium text-slate-400 py-2">
                               Own Project
                             </span>
                           ) : hasVoted ? (
-                            <div className="flex items-center space-x-1">
-                              <span className="inline-flex items-center space-x-1 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-bold text-emerald-700">
-                                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                            <div className="flex items-center space-x-1.5">
+                              <span className="inline-flex items-center space-x-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-700 min-h-[44px]">
+                                <Check className="h-4 w-4 text-emerald-600" />
                                 <span>Voted</span>
                               </span>
                               <button
                                 onClick={() => handleRemoveVote(sub.id)}
                                 disabled={isVotePending}
-                                className="text-[11px] text-slate-400 hover:text-rose-600 underline underline-offset-2 ml-1"
+                                className="text-xs text-slate-400 hover:text-rose-600 underline underline-offset-2 px-2 py-2 min-h-[44px] flex items-center"
                               >
                                 Undo
                               </button>
@@ -810,13 +810,13 @@ export function PublicEventDetailClient({
                             <button
                               onClick={() => handleVote(sub.id)}
                               disabled={isVotePending}
-                              className="inline-flex items-center space-x-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-600 transition-colors disabled:opacity-50"
+                              className="inline-flex items-center space-x-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-600 transition-colors disabled:opacity-50 min-h-[44px]"
                             >
-                              <Vote className="h-3.5 w-3.5" />
+                              <Vote className="h-4 w-4" />
                               <span>Vote</span>
                             </button>
                           ) : (
-                            <span className="text-[11px] font-medium text-slate-400">
+                            <span className="text-[11px] font-medium text-slate-400 py-2">
                               Limit Reached
                             </span>
                           )}

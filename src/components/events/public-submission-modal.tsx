@@ -209,15 +209,20 @@ export function PublicSubmissionModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={handleClose}
     >
       <div
-        className="relative flex flex-col max-h-[92vh] w-full max-w-xl overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-2xl"
+        className="relative flex flex-col max-h-[92dvh] sm:max-h-[88dvh] w-full max-w-xl overflow-hidden rounded-t-3xl sm:rounded-2xl bg-white border border-slate-200 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile Drag Indicator */}
+        <div className="pt-2.5 pb-1 sm:hidden flex justify-center shrink-0">
+          <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+        </div>
+
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-white">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 sm:px-6 py-3.5 sm:py-4 bg-white shrink-0">
           <div className="space-y-0.5">
             <h2 className="text-base font-bold text-slate-900">
               {step === "success"
@@ -228,14 +233,14 @@ export function PublicSubmissionModal({
             </h2>
             <div className="flex items-center space-x-1.5 text-xs text-slate-500">
               <span>Author:</span>
-              <span className="font-semibold text-slate-700">
+              <span className="font-semibold text-slate-700 truncate max-w-[200px]">
                 {participantDisplayName}
               </span>
             </div>
           </div>
           <button
             onClick={handleClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -244,8 +249,8 @@ export function PublicSubmissionModal({
 
         {/* Error Alert */}
         {errorMessage ? (
-          <div className="mx-6 mt-4 flex items-start space-x-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
-            <AlertCircle className="h-4 w-4 text-rose-600 flex-shrink-0 mt-0.5" />
+          <div className="mx-5 sm:mx-6 mt-3 flex items-start space-x-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 shrink-0">
+            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
             <span className="leading-relaxed">{errorMessage}</span>
           </div>
         ) : null}
@@ -271,7 +276,7 @@ export function PublicSubmissionModal({
                   placeholder="e.g. Autonomous Robotic Arm with 4-DOF Gripper"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-900 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-hidden font-medium"
+                  className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-hidden font-medium"
                 />
               </div>
 
@@ -301,7 +306,7 @@ export function PublicSubmissionModal({
                   placeholder="Describe your design, hardware specifications, mechanics, software stack, and what makes your project innovative..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-900 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-hidden leading-relaxed"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-hidden leading-relaxed"
                 />
               </div>
 
@@ -332,10 +337,10 @@ export function PublicSubmissionModal({
                         <button
                           type="button"
                           onClick={() => handleRemoveImage(idx)}
-                          className="absolute top-1.5 right-1.5 rounded-lg bg-rose-600/90 p-1.5 text-white hover:bg-rose-700 transition-colors shadow-xs"
+                          className="absolute top-1.5 right-1.5 rounded-lg bg-rose-600/90 p-2 text-white hover:bg-rose-700 transition-colors shadow-xs touch-manipulation"
                           aria-label="Remove image"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     ))}
@@ -344,7 +349,7 @@ export function PublicSubmissionModal({
 
                 {/* Upload Button area if images < max */}
                 {images.length < maxImages ? (
-                  <label className="relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 p-6 text-center hover:border-blue-500 hover:bg-blue-50/20 transition-all cursor-pointer bg-slate-50/50">
+                  <label className="relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 p-6 text-center hover:border-blue-500 hover:bg-blue-50/20 transition-all cursor-pointer bg-slate-50/50 touch-manipulation">
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
@@ -368,11 +373,11 @@ export function PublicSubmissionModal({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+              <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                  className="w-full sm:w-auto min-h-[44px] rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors justify-center flex items-center"
                 >
                   Cancel
                 </button>
@@ -384,7 +389,7 @@ export function PublicSubmissionModal({
                     description.trim().length < minDescriptionChars ||
                     !title.trim()
                   }
-                  className="inline-flex items-center space-x-1.5 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 shadow-xs"
+                  className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center space-x-1.5 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 shadow-xs"
                 >
                   <span>Review Submission</span>
                   <ArrowRight className="h-3.5 w-3.5" />
@@ -445,12 +450,12 @@ export function PublicSubmissionModal({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-end space-x-2 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setStep("form")}
                   disabled={isPending}
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                  className="w-full sm:w-auto min-h-[44px] rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors justify-center flex items-center"
                 >
                   Edit Details
                 </button>
@@ -458,7 +463,7 @@ export function PublicSubmissionModal({
                   type="button"
                   onClick={handleFinalSubmit}
                   disabled={isPending}
-                  className="inline-flex items-center space-x-1.5 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white hover:bg-emerald-600 transition-colors disabled:opacity-50 shadow-xs"
+                  className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center space-x-1.5 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white hover:bg-emerald-600 transition-colors disabled:opacity-50 shadow-xs"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   <span>{isPending ? "Submitting Project..." : "Confirm & Submit Project"}</span>
@@ -496,7 +501,7 @@ export function PublicSubmissionModal({
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="inline-flex items-center space-x-1.5 rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition-colors shadow-xs"
+                  className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center space-x-1.5 rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition-colors shadow-xs"
                 >
                   <span>Return to Challenge</span>
                 </button>
