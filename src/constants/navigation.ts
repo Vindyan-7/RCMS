@@ -18,6 +18,7 @@ import {
   Sparkles,
   FileSpreadsheet,
   Gift,
+  Trophy,
   LucideIcon,
 } from "lucide-react";
 
@@ -40,6 +41,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   { name: "Finance", href: "/dashboard/finance", icon: DollarSign },
   { name: "Inventory", href: "/dashboard/inventory", icon: Box },
   { name: "Communication", href: "/dashboard/communication", icon: Bell },
+  { name: "Club Events", href: "/dashboard/events", icon: Trophy },
   { name: "Team Studio", href: "/dashboard/team-studio", icon: Sparkles },
   { name: "Freshers Campaign", href: "/dashboard/freshers", icon: Gift },
   { name: "Reports Center", href: "/dashboard/reports", icon: FileSpreadsheet },

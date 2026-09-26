@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, Trophy, Info, Home, Sparkles } from "lucide-react";
+import { Bot, Trophy, Info, Home, Sparkles, Calendar } from "lucide-react";
 
 export function PublicHeader() {
   const pathname = usePathname();
 
   const navLinks = [
     { name: "Home", href: "/", icon: Home },
+    { name: "Club Events", href: "/events", icon: Calendar },
     { name: "Freshers", href: "/freshers", icon: Sparkles },
     { name: "Leaderboard", href: "/leaderboard", icon: Trophy },
     { name: "About", href: "/about", icon: Info },

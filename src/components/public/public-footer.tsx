@@ -33,6 +33,11 @@ export function PublicFooter() {
                 </Link>
               </li>
               <li>
+                <Link href="/events" className="hover:text-slate-900 transition-colors">
+                  Club Events
+                </Link>
+              </li>
+              <li>
                 <Link href="/leaderboard" className="hover:text-slate-900 transition-colors">
                   Public Leaderboard
                 </Link>

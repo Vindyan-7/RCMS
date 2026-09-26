@@ -35,6 +35,10 @@ export * from "./tasks";
 export * from "./task_completions";
 export * from "./events";
 export * from "./event_participations";
+export * from "./event_participants";
+export * from "./event_submissions";
+export * from "./event_submission_images";
+export * from "./event_votes";
 
 // Points Domain Schemas
 export * from "./points_ledger";
